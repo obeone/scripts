@@ -7,7 +7,7 @@ backend-path = "." # Specifies that setuptools should look for setup.py or setup
 
 [project]
 name = "ks-debug-helper"
-version = "0.1.0" # You can increment this version
+version = "0.1.&" # You can increment this version
 description = "A helper script to launch a debug container targeting a specific application container within a Kubernetes pod."
 readme = "README.md" # You will need to create this file
 authors = [
@@ -50,7 +50,11 @@ keywords = ["kubernetes", "k8s", "debug", "cli", "troubleshooting", "devops", "h
 [project.scripts]
 # 'ks' will be the command name available in the PATH after installation.
 # This assumes your script file is named ks.py and contains a main() function.
-ks = "ks:main"
+ks = "ks.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["ks"]
 
 # Optional: Project URLs (e.g., if you host it on GitHub)
 # [project.urls]
