@@ -1,0 +1,69 @@
+# pyproject.toml
+
+[build-system]
+# Specifies the build system Python packaging tools will use.
+# setuptools is a common choice.
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+backend-path = ["."] # Can be omitted if you don't have complex setuptools configurations in setup.py/setup.cfg
+
+[project]
+# Core metadata for the project (PEP 621)
+# Replace placeholder values with your project's specific details.
+
+name = "proxmox-migration-watcher"
+version = "0.1.0"
+description = "CLI tool to monitor Proxmox QEMU migration progress with a text-based transfer speed graph."
+readme = "README.md" # Optional: Create a README.md file in your project root
+requires-python = ">=3.7" # Specify the minimum Python version your project supports
+
+# License: Choose a license (e.g., MIT, Apache-2.0).
+# If you have a LICENSE file:
+# license = { file = "LICENSE" }
+# Or, if you want to specify it directly (e.g., for MIT):
+license = { text = "MIT" }
+
+authors = [
+    { name = "obeone", email = "obeone@obeone.org" },
+    # You can add more authors if needed
+    # { name = "Another Author", email = "another@example.com" },
+]
+
+# Project dependencies
+# These are libraries your project needs to run.
+dependencies = [
+    "plotext==5.3.2", # For the text-based speed graph
+]
+
+# Classifiers help users find your project and categorize it on PyPI.
+# Full list: https://pypi.org/classifiers/
+classifiers = [
+    "Development Status :: 4 - Beta", # Or "3 - Alpha", "5 - Production/Stable"
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Monitoring",
+    "Topic :: Utilities",
+    "Operating System :: POSIX :: Linux", # If primarily for Linux
+]
+
+# URLs related to your project (optional)
+[project.urls]
+Homepage = "https://github.com/obeone/scripts" # Example: "https://github.com/greg/proxmox-migration-watcher"
+Repository = "https://github.com/obeone/scripts"           # Example: "https://github.com/greg/proxmox-migration-watcher"
+# Documentation = "https_your_docs_url"
+# Changelog = "https_your_repo_url/blob/main/CHANGELOG.md"
+
+# Defines console scripts that should be created when your package is installed.
+[project.scripts]
+# This will create a command 'proxmox-watch' that executes the 'main' function
+# in 'watcher.py' (assuming your main Python file is named watcher.py).
+migration-watcher = "watcher:main"
