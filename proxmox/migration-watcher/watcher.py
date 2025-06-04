@@ -37,11 +37,6 @@ PLOT_WIDTH_POINTS = min(TERM_WIDTH_CHARS - 10, 70)
 
 first_cli_print_done = False
 
-# --- Functions (parse_upid, read_active_tasks, find_task_logfile, etc. are the same as before) ---
-# ... (Paste here the functions parse_upid, read_active_tasks, find_task_logfile (corrected),
-#      parse_progress_line, follow_log from the previous CLI version) ...
-# Ensure docstrings are present for each function.
-
 # Utility functions (those unchanged can be omitted here for brevity,
 # but must be present in your final .py file)
 
@@ -430,7 +425,6 @@ def main():
         print(
             f"Auto-selecting task: VM {task_to_monitor_details['vmid']} on node {task_to_monitor_details['upid'].split(':')[1]}")
     else:
-        # ... (task selection logic from previous version) ...
         print("Ongoing qmigrate tasks found:")
         for idx, task in enumerate(active_qmigrate_tasks):
             print(
