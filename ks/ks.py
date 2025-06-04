@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Utility script to ease launching a privileged debug container in Kubernetes."""
 
 import argparse
 import subprocess
 import sys
-import tempfile
 import json
 import uuid
 import os
@@ -175,8 +175,13 @@ def get_containers(namespace: str, pod_name: str, context_for_api: Optional[str]
             if pod.spec and pod.spec.containers:
                 return [c.name for c in pod.spec.containers]
         except ApiException as e:
-             if e.status != 404: # Log unless it's a simple not found
-                logger.error(f"API error reading pod {pod_name} to get containers: {e.status} {e.reason}")
+            if e.status != 404:  # Log unless it's a simple not found
+                logger.error(
+                    "API error reading pod %s to get containers: %s %s",
+                    pod_name,
+                    e.status,
+                    e.reason,
+                )
     return []
 
 # --- Completion Script Generation ---
@@ -280,13 +285,21 @@ def get_pods_with_node_display(namespace: str, context_for_api: Optional[str] = 
         try:
             pods = core_v1_api.list_namespaced_pod(namespace=namespace)
             for pod in pods.items:
-                 if pod.metadata and pod.metadata.name and pod.spec and pod.spec.node_name:
-                     pods_info.append(f"{pod.metadata.name} {pod.spec.node_name}")
-                 else:
-                     logger.debug(f"Skipping pod with incomplete data: {getattr(pod.metadata, 'name', 'N/A')}")
+                if (
+                    pod.metadata
+                    and pod.metadata.name
+                    and pod.spec
+                    and pod.spec.node_name
+                ):
+                    pods_info.append(f"{pod.metadata.name} {pod.spec.node_name}")
+                else:
+                    logger.debug(
+                        "Skipping pod with incomplete data: %s",
+                        getattr(pod.metadata, "name", "N/A"),
+                    )
         except ApiException as e:
             handle_api_exception_norm(e, f"list pods in namespace {namespace}")
-    return pods_info # Will be empty if handle_api_exception_norm exited
+    return pods_info  # Will be empty if handle_api_exception_norm exited
 
 def get_pod_metadata_display(namespace: str, pod_name: str, container_name: str, context_for_api: Optional[str] = None) -> Optional[Dict[str, Any]]:
     '''
@@ -454,9 +467,9 @@ def run_command(command: List[str], check: bool = True, capture_output: bool = T
             command, check=check, capture_output=capture_output, text=text, input=input_data
         )
         if capture_output and result.stderr and result.stderr.strip() and logger.isEnabledFor(logging.DEBUG):
-             logger.debug(f"External command stderr: {result.stderr.strip()}")
+            logger.debug("External command stderr: %s", result.stderr.strip())
         if capture_output and result.stdout and logger.isEnabledFor(logging.DEBUG):
-             logger.debug(f"External command stdout: {result.stdout.strip()}")
+            logger.debug("External command stdout: %s", result.stdout.strip())
         return result
     except FileNotFoundError:
         logger.error(f"Command not found: {command[0]}. Please ensure it is installed and in your PATH.")
@@ -590,9 +603,11 @@ def main():
         field_styles=coloredlogs.DEFAULT_FIELD_STYLES
     )
     logger.debug(f"Log level set to {log_level_name.upper()}")
-    if not KUBERNETES_AVAILABLE and not args.completion : # Don't log K8s missing if only generating completion script.
-         logger.warning("Python Kubernetes client library not found. Functionality will be limited.")
-         # No sys.exit here, allow completion or help to proceed if possible.
+    if not KUBERNETES_AVAILABLE and not args.completion:  # Don't log K8s missing if only generating completion script.
+        logger.warning(
+            "Python Kubernetes client library not found. Functionality will be limited."
+        )
+        # No sys.exit here, allow completion or help to proceed if possible.
 
     # --- Handle Meta Arguments (like completion list generation) ---
     # These require K8s lib, so check again if it wasn't available.
@@ -698,8 +713,6 @@ def main():
         # This section is security sensitive.
         # The 'sysadmin' profile for `kubectl debug` often requires the namespace
         # to allow privileged pods if Pod Security Admission is active.
-        label_was_set_by_script = False
-        is_privileged_label_needed = True # Assume needed by default for sysadmin profile
 
         # Simple check, could be more sophisticated by checking K8s version and PSA config
         if not check_namespace_label(namespace, context_for_api=context_arg):
@@ -707,17 +720,14 @@ def main():
             logger.info("This label might be required for 'kubectl debug --profile=sysadmin' to work correctly with Pod Security Admission.")
             # Here, one might add a user confirmation step if desired.
             if apply_namespace_label(namespace, context_for_api=context_arg):
-                label_was_set_by_script = True
                 # Register cleanup to remove the label ONLY if this script set it.
                 register_cleanup(remove_namespace_label, namespace, context_for_api=context_arg)
             else:
                 # apply_namespace_label would have exited on hard error.
                 # If it returned False, it implies a non-critical failure or already handled.
                 logger.error("Failed to apply privileged label to namespace. Debug session may fail.")
-                is_privileged_label_needed = False # Mark as not applied, proceed with caution
         else:
             logger.info(f"Namespace '{namespace}' already has the required privileged label or equivalent.")
-            is_privileged_label_needed = False # No need to clean up if it was already there
 
         # --- Construct and Run Final Kubectl Debug Command ---
         # Use a unique name for the debug container to avoid collisions.
@@ -749,17 +759,22 @@ def main():
             logger.info(f"Attempting to start debug session on '{namespace}/{pod_name}/{container_name}'...")
             logger.info(f"Executing: {final_command_str}")
             # run_command will exit on error
-            run_command(kubectl_cmd_list, check=True, capture_output=False, text=False) # text=False for direct TTY
-            logger.info(f"Debug session for '{debug_container_name}' finished.")
+            run_command(
+                kubectl_cmd_list,
+                check=True,
+                capture_output=False,
+                text=False,
+            )  # text=False for direct TTY
+            logger.info("Debug session for '%s' finished.", debug_container_name)
 
     except KeyboardInterrupt:
         logger.info("Operation interrupted by user (KeyboardInterrupt).")
-        sys.exit(130) # Standard exit code for Ctrl+C
+        sys.exit(130)  # Standard exit code for Ctrl+C
     except SystemExit as e:
         # Log SystemExit if it's not 0 (success) or 130 (user interrupt)
-        if e.code not in [0, 1, 130]: # fzf no selection often returns 1
-             logger.debug(f"Exiting script with code {e.code} due to SystemExit.")
-        raise # Re-raise to exit
+        if e.code not in [0, 1, 130]:  # fzf no selection often returns 1
+            logger.debug("Exiting script with code %s due to SystemExit.", e.code)
+        raise  # Re-raise to exit
     except Exception as e: # pylint: disable=broad-except
         logger.error(f"An unexpected error occurred in the main execution block: {e}", exc_info=True)
         sys.exit(1)
@@ -782,11 +797,17 @@ if __name__ == "__main__":
                     print_completion_script(shell_type)
                     sys.exit(0)
                 else:
-                    print(f"[ERROR] Unsupported shell for completion: {shell_type}. Choose bash, zsh, or fish.", file=sys.stderr)
+                    print(
+                        f"[ERROR] Unsupported shell for completion: {shell_type}. Choose bash, zsh, or fish.",
+                        file=sys.stderr,
+                    )
                     sys.exit(1)
             else:
-                 print("[ERROR] Missing shell type (bash, zsh, or fish) after --completion.", file=sys.stderr)
-                 sys.exit(1)
+                print(
+                    "[ERROR] Missing shell type (bash, zsh, or fish) after --completion.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
         except ValueError:
             # Should not happen if '--completion' is in sys.argv
             pass # Let main argument parsing handle it if something is malformed
