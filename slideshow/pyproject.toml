@@ -1,0 +1,24 @@
+[project]
+name = "slideshow"
+version = "0.1.0"
+description = "A feature-rich image slideshow application with Tkinter."
+readme = "README.md"
+requires-python = ">=3.9,<=3.11"
+dependencies = [
+    "pillow",
+    "coloredlogs",
+]
+authors = [
+    { name = "Your Name" },
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["slideshow"]
+
+[project.scripts]
+slideshow = "slideshow.__main__:main"
