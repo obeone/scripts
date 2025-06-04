@@ -415,7 +415,10 @@ def remove_namespace_label(namespace: str, context_for_api: Optional[str] = None
 
         try:
             core_v1_api.patch_namespace(name=namespace, body=patch_body)
-            logger.info(f"Successfully issued request to remove label from namespace '{namespace}' (if it existed).")
+            logger.info(
+                "Label 'pod-security.kubernetes.io/enforce' removed from namespace '%s' if present.",
+                namespace,
+            )
         except ApiException as e:
             if e.status == 404:
                 logger.warning(f"Namespace '{namespace}' not found during label removal attempt.")
