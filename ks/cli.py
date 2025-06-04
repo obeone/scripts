@@ -11,14 +11,14 @@ import uuid
 import coloredlogs
 from typing import Optional
 
-from ks_completion import print_completion_script
-from ks_helpers import (
+from .completion import print_completion_script
+from .helpers import (
     run_command,
     fzf_select,
     register_cleanup,
     run_cleanup,
 )
-from ks_k8s import (
+from .k8s import (
     ApiException,
     KUBERNETES_AVAILABLE,
     apply_namespace_label,
@@ -42,7 +42,7 @@ LOG_LEVEL_MAP = {
     "warn": logging.WARNING,
     "error": logging.ERROR,
 }
-SCRIPT_NAME = os.path.basename(__file__)
+SCRIPT_NAME = "ks"
 
 # --- Logger Setup ---
 logger = logging.getLogger()

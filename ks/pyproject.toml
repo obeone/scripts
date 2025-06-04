@@ -50,7 +50,7 @@ keywords = ["kubernetes", "k8s", "debug", "cli", "troubleshooting", "devops", "h
 [project.scripts]
 # 'ks' will be the command name available in the PATH after installation.
 # This assumes your script file is named ks.py and contains a main() function.
-ks = "ks:main"
+ks = "ks.cli:main"
 
 # Optional: Project URLs (e.g., if you host it on GitHub)
 # [project.urls]
