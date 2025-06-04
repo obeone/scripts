@@ -52,6 +52,10 @@ keywords = ["kubernetes", "k8s", "debug", "cli", "troubleshooting", "devops", "h
 # This assumes your script file is named ks.py and contains a main() function.
 ks = "ks.cli:main"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["ks"]
+
 # Optional: Project URLs (e.g., if you host it on GitHub)
 # [project.urls]
 # "Homepage" = "https://github.com/obeone/ks-debug-helper"
