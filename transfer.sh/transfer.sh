@@ -242,6 +242,9 @@ decrypt_file() {
 # Args:
 #   ... : Options (-d, -D, -k, -u, -p, -y, -h) followed by file/directory paths.
 send_file_or_directory() {
+    if ! check_service_reachable "$TRANSFERSH_URL"; then
+        return 1
+    fi
     local max_downloads="${TRANSFERSH_MAX_DOWNLOADS}"
     local max_days="${TRANSFERSH_MAX_DAYS}"
     local headers=()
@@ -520,6 +523,9 @@ send_file_or_directory() {
 # Args:
 #   ... : Options (-k, -u, -h) followed by URL and optional destination path.
 receive_file_or_directory() {
+    if ! check_service_reachable "$TRANSFERSH_URL"; then
+        return 1
+    fi
     local encryption_key="${TRANSFERSH_ENCRYPTION_KEY:-}"
     local offer_unzip="false"
     local destination_path="." # Default to current directory
@@ -771,6 +777,17 @@ info_command() {
 
 # --- Main script execution ---
 check_requirements
+
+# Verify that the Transfer.sh service is reachable before running any command
+check_service_reachable() {
+    local url="${1:-$TRANSFERSH_URL}"
+    log DEBUG "Checking connectivity to $url"
+    if ! command curl -s --head --fail "$url" >/dev/null; then
+        log ERROR "Cannot reach Transfer.sh service at $url. Check your network connection."
+        return 1
+    fi
+    return 0
+}
 
 # Store flags for deferred logging if needed, though current direct logging is mostly fine.
 
