@@ -22,6 +22,29 @@ set -u
 PV_AVAILABLE=false
 command -v pv >/dev/null 2>&1 && PV_AVAILABLE=true
 
+# Create a temporary file with an optional suffix in a portable way.
+# GNU mktemp supports --suffix, but BSD mktemp (macOS) does not.
+# If gmktemp is available, use it; otherwise fall back to renaming.
+mktemp_with_suffix() {
+    local suffix="$1"
+    local tmpfile
+
+    if tmpfile=$(mktemp --suffix="$suffix" 2>/dev/null); then
+        echo "$tmpfile"
+        return 0
+    fi
+
+    if command -v gmktemp >/dev/null 2>&1 && \
+       tmpfile=$(gmktemp --suffix="$suffix" 2>/dev/null); then
+        echo "$tmpfile"
+        return 0
+    fi
+
+    tmpfile=$(mktemp -t transfer.sh.XXXXXX)
+    mv "$tmpfile" "${tmpfile}${suffix}"
+    echo "${tmpfile}${suffix}"
+}
+
 # Environment defaults
 : "${TRANSFERSH_URL:=https://transfer.obeone.cloud}"
 : "${TRANSFERSH_MAX_DAYS:=}"
@@ -178,7 +201,7 @@ encrypt_file() {
     local key="$2"
     local outfile
 
-    outfile="$(mktemp --suffix=.enc)" # Will use TMPDIR if set
+    outfile="$(mktemp_with_suffix .enc)" # Will use TMPDIR if set
     log DEBUG "Temporary encrypted file will be: $outfile"
 
     if openssl enc -aes-256-cbc -salt -pbkdf2 -in "$file" -out "$outfile" -pass pass:"$key"; then
@@ -364,7 +387,7 @@ send_file_or_directory() {
 
     if [[ $# -gt 1 ]] || [[ -d "$1" ]]; then # Multiple files or a single directory
         should_zip=true
-        temp_file_to_upload="$(mktemp --suffix=.zip)" # Will use TMPDIR
+        temp_file_to_upload="$(mktemp_with_suffix .zip)" # Will use TMPDIR
         log DEBUG "Temporary zip file will be: $temp_file_to_upload"
         if ! create_zip "$temp_file_to_upload" "$@"; then
             rm -f "$temp_file_to_upload" # Clean up on failure
