@@ -782,7 +782,9 @@ check_requirements
 check_service_reachable() {
     local url="${1:-$TRANSFERSH_URL}"
     log DEBUG "Checking connectivity to $url"
-    if ! command curl -s --head --fail "$url" >/dev/null; then
+    # Some servers return 405 for HEAD requests on the root. Avoid --fail so
+    # curl's exit code only reflects network errors.
+    if ! command curl -s --head "$url" >/dev/null; then
         log ERROR "Cannot reach Transfer.sh service at $url. Check your network connection."
         return 1
     fi
