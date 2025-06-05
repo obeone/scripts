@@ -439,28 +439,27 @@ send_file_or_directory() {
 
     log INFO "Uploading '$upload_filename' (size: $(numfmt --to=iec-i --suffix=B "$file_size"))..."
 
-    local header_pipe
-    header_pipe=$(mktemp -u) # Create a unique name for the named pipe
-    mkfifo "$header_pipe" # Create the named pipe
+    local header_file
+    header_file=$(mktemp)
 
     # stderr of curl (which includes progress bar with --progress-bar) is redirected to /dev/null
     # to keep the main 'response' variable clean for download/delete URLs.
-    # Headers are dumped to the named pipe.
     if $PV_AVAILABLE; then
-        response=$( (pv -pterbN "Uploading" -s "$file_size" "$final_file_to_upload" | \
-                     command curl --dump-header "$header_pipe" "${auth_options[@]}" "${headers[@]}" \
-                               --upload-file - "${TRANSFERSH_URL}/${upload_filename}" --silent --show-error --fail \
-                               2>/dev/null ); \
-                   cat "$header_pipe" )
+        response=$(pv -pterbN "Uploading" -s "$file_size" "$final_file_to_upload" | \
+                   command curl --dump-header "$header_file" "${auth_options[@]}" "${headers[@]}" \
+                                 --upload-file - "${TRANSFERSH_URL}/${upload_filename}" --silent --show-error --fail 2>/dev/null)
     else
-        response=$( command curl --progress-bar --dump-header "$header_pipe" "${auth_options[@]}" "${headers[@]}" \
-                       --upload-file "$final_file_to_upload" "${TRANSFERSH_URL}/${upload_filename}" --silent --show-error --fail; \
-                   cat "$header_pipe" )
+        response=$(command curl --progress-bar --dump-header "$header_file" "${auth_options[@]}" "${headers[@]}" \
+                               --upload-file "$final_file_to_upload" "${TRANSFERSH_URL}/${upload_filename}" --silent --show-error --fail)
     fi
 
-    return_code=$? # Return code of the subshell (effectively curl)
+    return_code=$? # Return code of curl
+    local headers_content
+    headers_content=$(cat "$header_file")
+    rm "$header_file"
 
-    rm "$header_pipe" # Clean up pipe
+    response="${headers_content}
+${response}"
 
     # Clean up temporary files
     if [ "$final_file_to_upload" != "$temp_file_to_upload" ] && [ -f "$final_file_to_upload" ]; then
