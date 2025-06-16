@@ -36,6 +36,7 @@ from .k8s import (
 
 # --- Configuration ---
 DEFAULT_DEBUG_IMAGE = "harbor.obeone.cloud/public/netshoot:debian-podman"
+DEFAULT_DEBUG_PROFILE = os.getenv("KS_DEBUG_PROFILE", "sysadmin")
 LOG_LEVEL_MAP = {
     "debug": logging.DEBUG,
     "info": logging.INFO,
@@ -69,6 +70,11 @@ def main() -> None:
         "--image",
         default=DEFAULT_DEBUG_IMAGE,
         help=f"Debug container image to use (default: {DEFAULT_DEBUG_IMAGE})",
+    )
+    debug_group.add_argument(
+        "--profile",
+        default=DEFAULT_DEBUG_PROFILE,
+        help="Security profile for the debug container (default: sysadmin)",
     )
     debug_group.add_argument(
         "--dry-run",
@@ -149,6 +155,7 @@ def main() -> None:
     pod_name = args.pod
     container_name = args.container
     debug_image = args.image
+    debug_profile = args.profile
     dry_run = args.dry_run
 
     try:
@@ -220,7 +227,8 @@ def main() -> None:
                 namespace,
             )
             logger.info(
-                "This label might be required for 'kubectl debug --profile=sysadmin' to work correctly with Pod Security Admission."
+                "This label might be required for 'kubectl debug --profile=%s' to work correctly with Pod Security Admission.",
+                debug_profile,
             )
             if apply_namespace_label(namespace, context_for_api=context_arg):
                 register_cleanup(remove_namespace_label, namespace, context_for_api=context_arg)
@@ -250,7 +258,7 @@ def main() -> None:
             "--image-pull-policy=Always",
             "-c",
             debug_container_name,
-            "--profile=sysadmin",
+            f"--profile={debug_profile}",
             "--share-processes",
             "-ti",
         ])
