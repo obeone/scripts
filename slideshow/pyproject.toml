@@ -1,6 +1,6 @@
 [project]
 name = "slideshow"
-version = "0.1.0"
+version = "0.3.0"
 description = "A feature-rich image slideshow application with Tkinter."
 readme = "README.md"
 requires-python = ">=3.9,<=3.11"
@@ -9,7 +9,7 @@ dependencies = [
     "coloredlogs",
 ]
 authors = [
-    { name = "Your Name" },
+    { name="Grégoire Compagnon (obeone)", email="obeone@obeone.org" },
 ]
 
 [build-system]

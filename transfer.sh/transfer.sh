@@ -17,17 +17,41 @@
 #                 TMPDIR environment variable can be set using --tmp-dir option.
 ###################################################################
 
-# Fail on any error
-set -e
+set -u
+
+PV_AVAILABLE=false
+command -v pv >/dev/null 2>&1 && PV_AVAILABLE=true
+
+# Create a temporary file with an optional suffix in a portable way.
+# GNU mktemp supports --suffix, but BSD mktemp (macOS) does not.
+# If gmktemp is available, use it; otherwise fall back to renaming.
+mktemp_with_suffix() {
+    local suffix="$1"
+    local tmpfile
+
+    if tmpfile=$(mktemp --suffix="$suffix" 2>/dev/null); then
+        echo "$tmpfile"
+        return 0
+    fi
+
+    if command -v gmktemp >/dev/null 2>&1 && \
+       tmpfile=$(gmktemp --suffix="$suffix" 2>/dev/null); then
+        echo "$tmpfile"
+        return 0
+    fi
+
+    tmpfile=$(mktemp -t transfer.sh.XXXXXX)
+    mv "$tmpfile" "${tmpfile}${suffix}"
+    echo "${tmpfile}${suffix}"
+}
 
 # Environment defaults
-: ${TRANSFERSH_URL:="https://transfer.obeone.cloud"}
-: ${TRANSFERSH_MAX_DAYS:=}
-: ${TRANSFERSH_MAX_DOWNLOADS:=}
-: ${LOG_LEVEL:="INFO"}
-: ${DEBUG:=}
-: ${AUTH_USER:=""}
-: ${AUTH_PASS:=""}
+: "${TRANSFERSH_URL:=https://transfer.obeone.cloud}"
+: "${TRANSFERSH_MAX_DAYS:=}"
+: "${TRANSFERSH_MAX_DOWNLOADS:=}"
+: "${LOG_LEVEL:=INFO}"
+: "${AUTH_USER:=}"
+: "${AUTH_PASS:=}"
 
 COMMAND="$(basename "$0")"
 
@@ -40,9 +64,6 @@ MAGENTA='\e[35m'
 CYAN='\e[36m'
 RESET='\e[0m'
 BOLD='\e[1m'
-UNDERLINE='\e[4m'
-ITALIC='\e[3m'
-INVERTED='\e[7m'
 
 # Logs messages based on the defined LOG_LEVEL.
 #
@@ -93,10 +114,10 @@ log() {
     fi
 }
 
-# Checks if required commands (curl, openssl, zip, pv) are installed.
+# Checks if required commands are installed.
 # Exits if any requirement is missing.
 check_requirements() {
-    for cmd in curl openssl zip pv; do # Added pv as it's used
+    for cmd in curl openssl zip unzip tar; do
         if ! command -v "$cmd" &> /dev/null; then
             log ERROR "$cmd is not installed."
             exit 1
@@ -110,24 +131,12 @@ check_requirements() {
 # Args:
 #   ... (any curl arguments)
 #
-# Returns:
-#   int: Return code of the curl command.
-curl_call() {
-    log DEBUG "Calling curl with the following command: curl $*"
-    command curl "$@"
-    local return_code=$?
-    if [ $return_code -ne 0 ]; then
-        log ERROR "Curl command failed with return code: $return_code"
-    fi
-    return $return_code
-}
-
 # Displays help messages for the script or specific commands.
 #
 # Args:
 #   command_name (str, optional): The specific command to display help for.
 display_help() {
-    local command_name="$1"
+    local command_name="${1:-}"
     case "$command_name" in
         send)
             echo -e "${GREEN}Usage: $COMMAND send [OPTIONS] <file|directory> [<file|directory>...]${RESET}"
@@ -192,7 +201,7 @@ encrypt_file() {
     local key="$2"
     local outfile
 
-    outfile="$(mktemp --suffix=.enc)" # Will use TMPDIR if set
+    outfile="$(mktemp_with_suffix .enc)" # Will use TMPDIR if set
     log DEBUG "Temporary encrypted file will be: $outfile"
 
     if openssl enc -aes-256-cbc -salt -pbkdf2 -in "$file" -out "$outfile" -pass pass:"$key"; then
@@ -233,6 +242,9 @@ decrypt_file() {
 # Args:
 #   ... : Options (-d, -D, -k, -u, -p, -y, -h) followed by file/directory paths.
 send_file_or_directory() {
+    if ! check_service_reachable "$TRANSFERSH_URL"; then
+        return 1
+    fi
     local max_downloads="${TRANSFERSH_MAX_DOWNLOADS}"
     local max_days="${TRANSFERSH_MAX_DAYS}"
     local headers=()
@@ -306,7 +318,7 @@ send_file_or_directory() {
     create_zip() {
         local output_zip_file="$1"
         shift
-        log DEBUG "Creating ZIP file: $output_zip_file with content: $@"
+        log DEBUG "Creating ZIP file: $output_zip_file with content: $*"
         if zip -r "$output_zip_file" "$@"; then
             return 0
         else
@@ -378,7 +390,7 @@ send_file_or_directory() {
 
     if [[ $# -gt 1 ]] || [[ -d "$1" ]]; then # Multiple files or a single directory
         should_zip=true
-        temp_file_to_upload="$(mktemp --suffix=.zip)" # Will use TMPDIR
+        temp_file_to_upload="$(mktemp_with_suffix .zip)" # Will use TMPDIR
         log DEBUG "Temporary zip file will be: $temp_file_to_upload"
         if ! create_zip "$temp_file_to_upload" "$@"; then
             rm -f "$temp_file_to_upload" # Clean up on failure
@@ -408,8 +420,12 @@ send_file_or_directory() {
         upload_filename="$original_file_name.enc"
         log INFO "Encrypting '$original_file_name' to '$upload_filename'..."
         local encrypted_temp_file
-        encrypted_temp_file=$(encrypt_file "$temp_file_to_upload" "$encryption_key")
-        if [[ $? -ne 0 ]] || [ ! -f "$encrypted_temp_file" ]; then
+        if ! encrypted_temp_file=$(encrypt_file "$temp_file_to_upload" "$encryption_key"); then
+            log ERROR "Encryption failed. Cannot upload."
+            [ "$should_zip" = true ] && [ -f "$temp_file_to_upload" ] && rm "$temp_file_to_upload"
+            return 1
+        fi
+        if [ ! -f "$encrypted_temp_file" ]; then
             log ERROR "Encryption failed. Cannot upload."
             [ "$should_zip" = true ] && [ -f "$temp_file_to_upload" ] && rm "$temp_file_to_upload"
             return 1
@@ -423,22 +439,27 @@ send_file_or_directory() {
 
     log INFO "Uploading '$upload_filename' (size: $(numfmt --to=iec-i --suffix=B "$file_size"))..."
 
-    local header_pipe
-    header_pipe=$(mktemp -u) # Create a unique name for the named pipe
-    mkfifo "$header_pipe" # Create the named pipe
+    local header_file
+    header_file=$(mktemp)
 
     # stderr of curl (which includes progress bar with --progress-bar) is redirected to /dev/null
     # to keep the main 'response' variable clean for download/delete URLs.
-    # Headers are dumped to the named pipe.
-    response=$( (pv -pterbN "Uploading" -s "$file_size" "$final_file_to_upload" | \
-                 command curl --dump-header "$header_pipe" "${auth_options[@]}" "${headers[@]}" \
-                           --upload-file - "${TRANSFERSH_URL}/${upload_filename}" --silent --show-error --fail \
-                           2>/dev/null ) ; \
-                 cat "$header_pipe" ) # Read headers from pipe after curl finishes
+    if $PV_AVAILABLE; then
+        response=$(pv -pterbN "Uploading" -s "$file_size" "$final_file_to_upload" | \
+                   command curl --dump-header "$header_file" "${auth_options[@]}" "${headers[@]}" \
+                                 --upload-file - "${TRANSFERSH_URL}/${upload_filename}" --silent --show-error --fail 2>/dev/null)
+    else
+        response=$(command curl --progress-bar --dump-header "$header_file" "${auth_options[@]}" "${headers[@]}" \
+                               --upload-file "$final_file_to_upload" "${TRANSFERSH_URL}/${upload_filename}" --silent --show-error --fail)
+    fi
 
-    return_code=$? # Return code of the subshell (effectively curl)
+    return_code=$? # Return code of curl
+    local headers_content
+    headers_content=$(cat "$header_file")
+    rm "$header_file"
 
-    rm "$header_pipe" # Clean up pipe
+    response="${headers_content}
+${response}"
 
     # Clean up temporary files
     if [ "$final_file_to_upload" != "$temp_file_to_upload" ] && [ -f "$final_file_to_upload" ]; then
@@ -501,6 +522,9 @@ send_file_or_directory() {
 # Args:
 #   ... : Options (-k, -u, -h) followed by URL and optional destination path.
 receive_file_or_directory() {
+    if ! check_service_reachable "$TRANSFERSH_URL"; then
+        return 1
+    fi
     local encryption_key="${TRANSFERSH_ENCRYPTION_KEY:-}"
     local offer_unzip="false"
     local destination_path="." # Default to current directory
@@ -595,15 +619,6 @@ receive_file_or_directory() {
         log DEBUG "Encrypted file will be temporarily downloaded to: $temp_download_target"
     fi
 
-    local remote_size_header
-    remote_size_header=$(command curl -sI "$url" | grep -i '^Content-Length:' | awk '{print $2}' | tr -d '\r\n')
-    local remote_size=0
-    if [[ "$remote_size_header" =~ ^[0-9]+$ ]]; then
-        remote_size=$remote_size_header
-    else
-        log WARN "Could not determine remote file size. Progress bar may not be accurate."
-    fi
-
     log INFO "Attempting to save to: $curl_target_path (final name on disk: $final_file_name_on_disk)"
 
     # Using command curl directly for download part to ensure --progress-bar goes to tty
@@ -679,18 +694,10 @@ delete_file_or_directory() {
 
     local delete_url="$1"
     log INFO "Attempting to delete file using URL: $delete_url"
-    local response_body
-    local http_code
-    # Get body and http_code separately
-    http_code=$(command curl -X DELETE "$delete_url" -w "%{http_code}" -s -o /dev/stderr) # Body to stderr, code to stdout
-    response_body=$(command curl -X DELETE "$delete_url" -s) # Get body separately if needed, or parse from above.
-                                                              # Simpler:
-    http_code=$(command curl -X DELETE "$delete_url" -w "%{http_code}" -s -o >(cat >&2)) # stdout for code, stderr for body
-
-    # Most reliable for http_code and body:
-    response_output=$(command curl -X DELETE "$delete_url" -w "\nHTTP_CODE:%{http_code}" -s)
-    http_code=$(echo -e "$response_output" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
-    response_body=$(echo -e "$response_output" | sed '$d')
+    local response
+    response=$(curl -s -w "%{http_code}" -X DELETE "$delete_url")
+    local http_code="${response: -3}"
+    local response_body="${response::-3}"
 
 
     log DEBUG "Delete response body: $response_body"
@@ -723,9 +730,8 @@ info_command() {
     local url="$1"
     log INFO "Retrieving information for URL: $url"
     local headers
-    headers=$(command curl -I "$url" -s) # Use command curl directly and -s for silent
-    if [ $? -ne 0 ]; then # Check curl exit status
-        log ERROR "Failed to retrieve headers from $url (curl command failed)"
+    if ! headers=$(command curl -I "$url" -s); then
+        log ERROR "Failed to retrieve headers from $url"
         return 1
     fi
     if [[ -z "$headers" ]]; then
@@ -771,9 +777,20 @@ info_command() {
 # --- Main script execution ---
 check_requirements
 
+# Verify that the Transfer.sh service is reachable before running any command
+check_service_reachable() {
+    local url="${1:-$TRANSFERSH_URL}"
+    log DEBUG "Checking connectivity to $url"
+    # Some servers return 405 for HEAD requests on the root. Avoid --fail so
+    # curl's exit code only reflects network errors.
+    if ! command curl -s --head "$url" >/dev/null; then
+        log ERROR "Cannot reach Transfer.sh service at $url. Check your network connection."
+        return 1
+    fi
+    return 0
+}
+
 # Store flags for deferred logging if needed, though current direct logging is mostly fine.
-TMPDIR_SET_BY_OPTION=""
-LOG_LEVEL_SET_BY_OPTION=""
 
 # Pre-parse global options. This loop consumes global options.
 # The remaining arguments are for the command.
@@ -796,8 +813,7 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             LOG_LEVEL="$2"
-            LOG_LEVEL_SET_BY_OPTION="true" # Mark that it was set
-            log INFO "Log level set to: $LOG_LEVEL" # Now safe to use log()
+            log INFO "Log level set to: $LOG_LEVEL"
             shift 2
             continue
             ;;
@@ -812,8 +828,7 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             export TMPDIR="$2"
-            TMPDIR_SET_BY_OPTION="true" # Mark that it was set
-            log INFO "Using custom temporary directory: $TMPDIR" # Safe to use log()
+            log INFO "Using custom temporary directory: $TMPDIR"
             shift 2
             continue
             ;;
