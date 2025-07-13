@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import simpledialog, messagebox
 import logging
 import coloredlogs # For colored console output
-import os
+# import os  # Removed unused import to clean up code
 import argparse
 import random
 import sys
@@ -56,7 +56,7 @@ class ImageSlideshowApp:
         _animate_gif_idx (int): Current frame index for GIF animation.
     '''
 
-    def __init__(self, window: tk.Tk, image_folder: str, delay: float = 3.0, auto_stop_delay: int | None = None, log_level: str = 'WARNING'):
+    def __init__(self, window: tk.Tk, image_folder: str, delay: float = 3.0, auto_stop_delay: int | None = None, preload_count: int = 20, log_level: str = 'WARNING'):
         '''
         Initializes the ImageSlideshowApp instance, sets up UI and loads images.
 
@@ -108,6 +108,8 @@ class ImageSlideshowApp:
         self._animate_gif_frames: list[ImageTk.PhotoImage] = []
         self._animate_gif_durations: list[int] = []
         self._animate_gif_idx: int = 0
+
+        self.preload_count = preload_count  # Number of images to preload by default
 
         self.load_icons() # Load any UI icons (currently placeholder)
         self.load_images() # Discover and list all image files
@@ -393,17 +395,17 @@ class ImageSlideshowApp:
         else:
             logger.warning(f"No images found in '{self.image_folder}' with supported extensions: {image_extensions}")
 
-    def preload_next_images(self, count: int = 5) -> None:
+    def preload_next_images(self, count: int | None = None) -> None:
         '''
-        Preloads the next `count` images into memory for faster display.
-        Manages the `self.preloaded_images` cache by adding new images and
-        evicting older ones that are far from the current view.
-
+        Preloads the next N images into memory for faster display (N configurable).
         Args:
-            count (int): The number of subsequent images to attempt to preload. Defaults to 5.
+            count (int | None): The number of subsequent images to attempt to preload. If None, uses self.preload_count.
         '''
         if not self.images:
             return
+
+        if count is None:
+            count = self.preload_count
 
         indices_to_preload = []
         # Determine which images (by index) need preloading
@@ -411,17 +413,16 @@ class ImageSlideshowApp:
             next_idx = (self.current_index + i) % len(self.images)
             if next_idx not in self.preloaded_images: # Only if not already in cache
                 indices_to_preload.append(next_idx)
-            
             # Stop preloading if we are at the end of the list and not looping
-            if not self.loop and (self.current_index + i) >= (len(self.images) -1) :
+            if not self.loop and (self.current_index + i) >= (len(self.images) -1):
                 break
-            if len(indices_to_preload) >= count: # Preloaded enough for this call
+            if len(indices_to_preload) >= count:
                 break
-        
+
         # Load the identified images
         for index_to_load in indices_to_preload:
-            if index_to_load in self.preloaded_images: continue # Double check, might have been loaded concurrently
-
+            if index_to_load in self.preloaded_images:
+                continue # Double check
             image_path = self.images[index_to_load]
             try:
                 image = Image.open(image_path)
@@ -430,25 +431,27 @@ class ImageSlideshowApp:
                 logger.debug(f"Preloaded image {index_to_load + 1}/{len(self.images)}: {image_path.name}")
             except Exception as e:
                 logger.error(f"Error preloading image '{image_path.name}' (index {index_to_load}): {e}")
-                if index_to_load in self.preloaded_images: # Clean up if loading failed
+                if index_to_load in self.preloaded_images:
                     del self.preloaded_images[index_to_load]
 
         # Cache eviction strategy: remove images "far" from the current one.
         # Keeps a window of `count * 2` images before and after the current image.
         keys_to_keep = set()
-        if self.images: # Ensure images list is not empty for modulo
-            # Window size for keeping preloaded images (e.g. current +/- 10 if count is 5)
-            preload_window_size = count * 2 
+        if self.images:
+            preload_window_size = count * 2
             for i in range(-preload_window_size, preload_window_size + 1):
                 idx_to_keep = (self.current_index + i + len(self.images)) % len(self.images)
                 keys_to_keep.add(idx_to_keep)
 
-        # Evict images not in the 'keep' set
         current_preloaded_keys = list(self.preloaded_images.keys())
         for key in current_preloaded_keys:
             if key not in keys_to_keep:
                 del self.preloaded_images[key]
-                # logger.debug(f"Evicted image at index {key} from preload cache.")
+
+        # Affichage évolutif du nombre d'images préchargées (pour suivi dynamique)
+        if not hasattr(self, '_last_buffer_count') or self._last_buffer_count != len(self.preloaded_images):
+            logger.info(f"[Préchargement] Images en mémoire : {len(self.preloaded_images)}")
+            self._last_buffer_count = len(self.preloaded_images)
 
     def on_resize(self, event: tk.Event) -> None:
         '''
@@ -495,9 +498,11 @@ class ImageSlideshowApp:
 
         # Cancel any pending slideshow advancement or GIF animation from the previous image
         if self.after_id:
-            self.window.after_cancel(self.after_id); self.after_id = None
+            self.window.after_cancel(self.after_id)
+            self.after_id = None
         if self._gif_animation_after_id:
-            self.window.after_cancel(self._gif_animation_after_id); self._gif_animation_after_id = None
+            self.window.after_cancel(self._gif_animation_after_id)
+            self._gif_animation_after_id = None
 
         # Check for auto-stop condition
         if self.auto_stop and self.stop_time and time.time() >= self.stop_time:
@@ -547,8 +552,8 @@ class ImageSlideshowApp:
             self.canvas.delete("all") # Clear canvas of previous image, HUD, info
 
             # Handle animated GIFs
-            if getattr(pil_image, "is_animated", False) and pil_image.n_frames > 1:
-                logger.debug(f"Processing animated GIF: {image_path.name} ({pil_image.n_frames} frames)")
+            if getattr(pil_image, "is_animated", False) and pil_image.n_frames > 1:  # type: ignore[attr-defined]
+                logger.debug(f"Processing animated GIF: {image_path.name} ({pil_image.n_frames} frames)")  # type: ignore[attr-defined]
                 self._animate_gif_frames = []
                 self._animate_gif_durations = []
                 for frame_pil in ImageSequence.Iterator(pil_image):
@@ -575,7 +580,8 @@ class ImageSlideshowApp:
         except FileNotFoundError:
             logger.error(f"Image file not found: {image_path}. Removing from list.")
             self.images.pop(self.current_index) # Remove missing image
-            if self.current_index in self.preloaded_images: del self.preloaded_images[self.current_index]
+            if self.current_index in self.preloaded_images:
+                del self.preloaded_images[self.current_index]
             # Adjust favorite indices
             self.favorites = [idx if idx < self.current_index else idx - 1 for idx in self.favorites if idx != self.current_index]
             
@@ -591,16 +597,16 @@ class ImageSlideshowApp:
             logger.error(f"Unhandled error displaying image '{image_path.name}': {e}", exc_info=True)
             # Attempt to gracefully move to the next image if in auto-play mode
             if self.timer_running:
-                 self.after_id = self.window.after(100, self.next_image_auto) # Try next image quickly
+                self.after_id = self.window.after(100, self.next_image_auto) # Try next image quickly
             return
 
         # Preload images for the next transition
-        self.preload_next_images()
+        self.preload_next_images()  # Uses new default
 
         # Schedule the next image if the timer is running and not currently in a GIF animation loop
         # (GIF loop handles its own timing and can trigger next_image_auto upon completion)
         if self.timer_running and not (hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id) :
-             if not (getattr(pil_image, "is_animated", False) and pil_image.n_frames > 1): # If not a GIF currently animating
+             if not (getattr(pil_image, "is_animated", False) and pil_image.n_frames > 1):  # type: ignore[attr-defined]  # If not a GIF currently animating
                  self.after_id = self.window.after(int(self.delay * 1000), self.next_image_auto)
 
 
@@ -620,7 +626,7 @@ class ImageSlideshowApp:
             # Display image on canvas, centered
             self.canvas.create_image(canvas_width // 2, canvas_height // 2, image=photo, anchor=tk.CENTER, tags="image")
             # IMPORTANT: Keep a reference to the PhotoImage to prevent garbage collection
-            self.canvas.image = photo 
+            self.canvas.image = photo  # type: ignore[attr-defined]
         except Exception as e:
             # Log error if PhotoImage creation or display fails
             logger.error(f"Error creating or displaying static PhotoImage: {e}", exc_info=True)
@@ -660,7 +666,7 @@ class ImageSlideshowApp:
                 image=current_frame_photoimage, anchor=tk.CENTER, tags="image"
             )
             # Keep a reference to the current frame's PhotoImage
-            self.canvas.image = current_frame_photoimage
+            self.canvas.image = current_frame_photoimage  # type: ignore[attr-defined]
 
         # Move to the next frame index, looping if necessary
         self._animate_gif_idx = (self._animate_gif_idx + 1) % len(self._animate_gif_frames)
@@ -726,7 +732,7 @@ class ImageSlideshowApp:
         new_height = max(1, new_height)
 
         # Select resampling filter (LANCZOS is good for downscaling)
-        resample_filter = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS # Pillow 9.1.0+
+        resample_filter = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS  # type: ignore[attr-defined]  # Pillow 9.1.0+
         
         try:
             #logger.debug(f"Resizing image from {image.size} to ({new_width}, {new_height})")
@@ -906,13 +912,16 @@ class ImageSlideshowApp:
         It respects the `loop` setting.
         '''
         if not self.images: # Should not happen if initial checks are done
-            self.timer_running = False; return
+            self.timer_running = False
+            return
 
         if not self.loop and self.current_index >= len(self.images) - 1:
             # Reached the end of the list and looping is off
             self.timer_running = False # Stop the timer
             logger.info("End of slideshow reached (looping is off).")
-            if self.after_id: self.window.after_cancel(self.after_id); self.after_id = None # Clear just in case
+            if self.after_id:
+                self.window.after_cancel(self.after_id)
+                self.after_id = None # Clear just in case
             self.update_hud() # Reflect paused state
             return
         
@@ -936,7 +945,9 @@ class ImageSlideshowApp:
         if self.timer_running:
             # If resuming play:
             # Cancel any old main timer (after_id) to avoid multiple timers.
-            if self.after_id: self.window.after_cancel(self.after_id); self.after_id = None
+            if self.after_id:
+                self.window.after_cancel(self.after_id)
+                self.after_id = None
             
             # Re-calling show_image for the current image will:
             # 1. If it's a GIF, its animation might resume or continue.
@@ -946,7 +957,9 @@ class ImageSlideshowApp:
         else: 
             # If pausing:
             # Cancel the main slideshow advancement timer.
-            if self.after_id: self.window.after_cancel(self.after_id); self.after_id = None
+            if self.after_id:
+                self.window.after_cancel(self.after_id)
+                self.after_id = None
             # Also cancel any ongoing GIF frame animation timer.
             if hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id:
                 self.window.after_cancel(self._gif_animation_after_id)
@@ -963,13 +976,17 @@ class ImageSlideshowApp:
         Args:
             event (tk.Event | None): The Tkinter event. Defaults to None.
         '''
-        if not self.images: return # No images to navigate
+        if not self.images:
+            return # No images to navigate
 
         self.timer_running = False # Manual navigation pauses the timer
         # Cancel any pending auto-advance or GIF animation
-        if self.after_id: self.window.after_cancel(self.after_id); self.after_id = None
+        if self.after_id:
+            self.window.after_cancel(self.after_id)
+            self.after_id = None
         if hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id:
-            self.window.after_cancel(self._gif_animation_after_id); self._gif_animation_after_id = None
+            self.window.after_cancel(self._gif_animation_after_id)
+            self._gif_animation_after_id = None
         
         next_idx = (self.current_index + 1) % len(self.images)
         # If not looping and currently on the last image, clicking next does nothing more.
@@ -988,13 +1005,17 @@ class ImageSlideshowApp:
         Args:
             event (tk.Event | None): The Tkinter event. Defaults to None.
         '''
-        if not self.images: return # No images to navigate
+        if not self.images:
+            return # No images to navigate
 
         self.timer_running = False # Manual navigation pauses the timer
         # Cancel any pending auto-advance or GIF animation
-        if self.after_id: self.window.after_cancel(self.after_id); self.after_id = None
+        if self.after_id:
+            self.window.after_cancel(self.after_id)
+            self.after_id = None
         if hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id:
-            self.window.after_cancel(self._gif_animation_after_id); self._gif_animation_after_id = None
+            self.window.after_cancel(self._gif_animation_after_id)
+            self._gif_animation_after_id = None
 
         # Calculate previous index, wrapping around correctly
         prev_idx = (self.current_index - 1 + len(self.images)) % len(self.images)
@@ -1152,8 +1173,10 @@ class ImageSlideshowApp:
                     
                     # Decode bytes values, truncate long strings
                     value_str = str(value)
-                    if isinstance(value, bytes): value_str = value.decode(errors='replace') # Handle byte strings
-                    if len(value_str) > 55: value_str = value_str[:52] + "..." # Truncate long values
+                    if isinstance(value, bytes):
+                        value_str = value.decode(errors='replace') # Handle byte strings
+                    if len(value_str) > 55:
+                        value_str = value_str[:52] + "..." # Truncate long values
                     
                     info_items.append(f"  {tag_name}: {value_str}")
                     exif_display_count += 1
@@ -1383,11 +1406,14 @@ class ImageSlideshowApp:
 
         # Cancel any pending 'after' jobs to prevent errors during shutdown
         if self.after_id:
-            self.window.after_cancel(self.after_id); self.after_id = None
+            self.window.after_cancel(self.after_id)
+            self.after_id = None
         if hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id: # Check if attribute exists
-            self.window.after_cancel(self._gif_animation_after_id); self._gif_animation_after_id = None
+            self.window.after_cancel(self._gif_animation_after_id)
+            self._gif_animation_after_id = None
         if hasattr(self, '_resize_job') and self._resize_job: # Check if attribute exists
-            self.window.after_cancel(self._resize_job); self._resize_job = None
+            self.window.after_cancel(self._resize_job)
+            self._resize_job = None
         
         logger.info("Attempting to destroy Tkinter window.")
         try:
@@ -1417,8 +1443,8 @@ def main():
     parser.add_argument(
         '--delay', '-d', 
         type=float, 
-        default=3.0, 
-        help="Delay between images in seconds during automatic slideshow. Default: 3.0s."
+        default=1.0, 
+        help="Delay between images in seconds during automatic slideshow. Default: 1.0s."
     )
     parser.add_argument(
         '--auto-stop', '-as', 
@@ -1440,6 +1466,13 @@ def main():
         default='INFO', 
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], 
         help="Set the logging level for console output. Default: INFO."
+    )
+    parser.add_argument(
+        '--preload-count',
+        type=int,
+        default=20,
+        metavar='N',
+        help="Number of images to preload ahead for smoothness (default: 20)"
     )
     parser.add_argument(
         '--shuffle', # Changed from --shuffle-on-start for brevity
@@ -1466,6 +1499,7 @@ def main():
             args.image_folder,
             delay=args.delay,
             auto_stop_delay=args.auto_stop, # Pass the value; app handles None
+            preload_count=args.preload_count,
             log_level=args.log_level
         )
 
@@ -1506,12 +1540,14 @@ def main():
         # Catch TclErrors, often related to display server issues or Tk setup problems
         logger.critical(f"Tkinter TclError occurred: {e}. Ensure a display server (X11, Wayland, Aqua) is available and configured.", exc_info=True)
         print(f"Critical Tkinter Error: {e}. Could not initialize graphics. Please ensure a display server is available.", file=sys.stderr)
-        if app_instance_window and app_instance_window.winfo_exists(): app_instance_window.destroy()
+        if app_instance_window and app_instance_window.winfo_exists():
+            app_instance_window.destroy()
         sys.exit(1)
     except FileNotFoundError as e: # Catch issues like image folder not found if not handled by Path lib early enough
         logger.critical(f"File system error, likely related to the image folder: {e}", exc_info=True)
         print(f"Error: {e}", file=sys.stderr)
-        if app_instance_window and app_instance_window.winfo_exists(): app_instance_window.destroy()
+        if app_instance_window and app_instance_window.winfo_exists():
+            app_instance_window.destroy()
         sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Application interrupted by user (Ctrl+C). Initiating shutdown.")
@@ -1520,7 +1556,8 @@ def main():
         # Catch any other unexpected exceptions during application setup or runtime
         logger.critical(f"An unexpected error occurred in the main execution block: {e}", exc_info=True)
         print(f"An unexpected error occurred: {e}", file=sys.stderr)
-        if app_instance_window and app_instance_window.winfo_exists(): app_instance_window.destroy()
+        if app_instance_window and app_instance_window.winfo_exists():
+            app_instance_window.destroy()
         sys.exit(1)
     finally:
         # Ensure graceful shutdown if app instance was created
