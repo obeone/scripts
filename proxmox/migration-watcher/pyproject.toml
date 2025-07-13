@@ -12,7 +12,7 @@ backend-path = ["."] # Can be omitted if you don't have complex setuptools confi
 # Replace placeholder values with your project's specific details.
 
 name = "proxmox-migration-watcher"
-version = "0.1.0"
+version = "0.2.0"
 description = "CLI tool to monitor Proxmox QEMU migration progress with a text-based transfer speed graph."
 readme = "README.md" # Optional: Create a README.md file in your project root
 requires-python = ">=3.7" # Specify the minimum Python version your project supports
@@ -25,8 +25,6 @@ license = { text = "MIT" }
 
 authors = [
     { name = "obeone", email = "obeone@obeone.org" },
-    # You can add more authors if needed
-    # { name = "Another Author", email = "another@example.com" },
 ]
 
 # Project dependencies
@@ -57,13 +55,16 @@ classifiers = [
 
 # URLs related to your project (optional)
 [project.urls]
-Homepage = "https://github.com/obeone/scripts" # Example: "https://github.com/greg/proxmox-migration-watcher"
-Repository = "https://github.com/obeone/scripts"           # Example: "https://github.com/greg/proxmox-migration-watcher"
+Homepage = "https://github.com/obeone/scripts"
+Repository = "https://github.com/obeone/scripts"
 # Documentation = "https_your_docs_url"
 # Changelog = "https_your_repo_url/blob/main/CHANGELOG.md"
 
 # Defines console scripts that should be created when your package is installed.
 [project.scripts]
-# This will create a command 'proxmox-watch' that executes the 'main' function
-# in 'watcher.py' (assuming your main Python file is named watcher.py).
-migration-watcher = "watcher:main"
+pve-migration-watcher = "watcher:main"
+
+
+# Setuptools-specific configuration to include the single-module `watcher.py`
+[tool.setuptools]
+py-modules = ["watcher"]

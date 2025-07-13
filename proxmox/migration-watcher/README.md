@@ -6,7 +6,7 @@ A command-line tool to monitor Proxmox QEMU migration progress with a text-based
 
 This tool connects to the Proxmox task logs (`/var/log/pve/tasks/`) to find active QEMU migration tasks. It then follows the log file for the selected task, parses the progress updates, calculates the transfer speed and estimated time of arrival (ETA), and displays this information in a dynamic command-line interface. A key feature is the text-based graph showing the historical transfer speed using the `plotext` library.
 
-It's designed to provide a more detailed and visual overview of ongoing migrations than the standard Proxmox CLI output.
+It is designed to provide a more detailed and visual overview of ongoing migrations than the standard Proxmox CLI output.
 
 ## Features
 
@@ -21,13 +21,13 @@ It's designed to provide a more detailed and visual overview of ongoing migratio
 
 ## Installation
 
-This tool requires Python 3.7 or higher. It's recommended to install it in a isolated environment using `pipx` or `uv`.
+This tool requires Python 3.7 or higher. It is recommended to install it in an isolated environment using `pipx` or `uv`.
 
 ### Using pipx (Recommended)
 
 `pipx` installs Python applications into isolated environments to avoid dependency conflicts.
 
-1. Make sure you have `pipx` installed. If not, [follow the instructions](https://pypa.io/stable/installation/#pipx).
+1. Ensure you have `pipx` installed. If not, [follow the instructions](https://pypa.io/stable/installation/#pipx).
 2. Install the tool:
 
     ```bash
@@ -39,14 +39,14 @@ This tool requires Python 3.7 or higher. It's recommended to install it in a iso
 3. Alternatively, install directly from the Git repository URL:
 
     ```bash
-    pipx install https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher
+    pipx install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher'
     ```
 
 ### Using uv
 
 `uv` is a fast Python package installer and manager.
 
-1. Make sure you have `uv` installed. If not, [follow the instructions](https://github.com/astral-sh/uv#installation).
+1. Ensure you have `uv` installed. If not, [follow the instructions](https://github.com/astral-sh/uv#installation).
 2. Install the tool:
 
     ```bash
@@ -58,7 +58,7 @@ This tool requires Python 3.7 or higher. It's recommended to install it in a iso
 3. Alternatively, install directly from the Git repository URL:
 
     ```bash
-    uv tool install https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher
+    uv tool install https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher'
     ```
 
 ### Classic Method (using venv and pip)
@@ -98,19 +98,19 @@ You can also install it in a standard Python virtual environment.
 
 ## Usage
 
-Once installed (either via `pipx`, `uv`, or activated in a `venv`), you can run the tool using the console script name defined in `pyproject.toml`:
+Once installed (via `pipx`, `uv`, or activated in a `venv`), run the tool using the console script name defined in `pyproject.toml`:
 
 ```bash
-migration-watcher
+pve-migration-watcher
 ```
 
-The tool will list active `qmigrate` tasks and prompt you to select one if there are multiple. It will then start monitoring the selected task's log file and display the progress.
+The tool will list active `qmigrate` tasks and prompt you to select one if multiple are running. It will then start monitoring the selected task's log file and display the progress.
 
 Press `Ctrl+C` to stop monitoring.
 
 ## Requirements
 
-* Python 3.7+
+* Python 3.7 or higher
 * Access to Proxmox task logs (`/var/log/pve/tasks/`). This typically means running the tool on a Proxmox node or having appropriate permissions and access to the filesystem.
 * `plotext` Python library (installed automatically by the installation methods above).
 
