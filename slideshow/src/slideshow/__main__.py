@@ -142,6 +142,9 @@ class ImageSlideshowApp:
         self.window.bind('<space>', self.toggle_timer)
         self.window.bind('<Right>', self.next_image)
         self.window.bind('<Left>', self.previous_image)
+        # Jump forward/backward by 10 images
+        self.window.bind('<Up>', self.jump_backward_ten)
+        self.window.bind('<Down>', self.jump_forward_ten)
         self.window.bind('<MouseWheel>', self.on_scroll) # Scroll for next/prev
         self.window.bind('<Button-1>', self.on_click)    # Left-click to toggle play/pause
 
@@ -575,7 +578,8 @@ class ImageSlideshowApp:
         except FileNotFoundError:
             logger.error(f"Image file not found: {image_path}. Removing from list.")
             self.images.pop(self.current_index) # Remove missing image
-            if self.current_index in self.preloaded_images: del self.preloaded_images[self.current_index]
+            if self.current_index in self.preloaded_images: 
+                del self.preloaded_images[self.current_index]
             # Adjust favorite indices
             self.favorites = [idx if idx < self.current_index else idx - 1 for idx in self.favorites if idx != self.current_index]
             
@@ -1006,6 +1010,52 @@ class ImageSlideshowApp:
             self.show_image(prev_idx)
         self.update_hud() # Reflect paused state and new image index
 
+    def jump_forward_ten(self, event: tk.Event | None = None) -> None:
+        '''
+        Jumps forward by 10 images in the slideshow. Pauses the automatic timer.
+        '''
+        if not self.images:
+            return
+        self.timer_running = False
+        if self.after_id:
+            self.window.after_cancel(self.after_id)
+            self.after_id = None
+        if hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id:
+            self.window.after_cancel(self._gif_animation_after_id)
+            self._gif_animation_after_id = None
+
+        n = len(self.images)
+        if self.loop:
+            new_idx = (self.current_index + 10) % n
+        else:
+            new_idx = min(self.current_index + 10, n - 1)
+
+        self.show_image(new_idx)
+        self.update_hud()
+
+    def jump_backward_ten(self, event: tk.Event | None = None) -> None:
+        '''
+        Jumps backward by 10 images in the slideshow. Pauses the automatic timer.
+        '''
+        if not self.images:
+            return
+        self.timer_running = False
+        if self.after_id:
+            self.window.after_cancel(self.after_id)
+            self.after_id = None
+        if hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id:
+            self.window.after_cancel(self._gif_animation_after_id)
+            self._gif_animation_after_id = None
+
+        n = len(self.images)
+        if self.loop:
+            new_idx = (self.current_index - 10) % n
+        else:
+            new_idx = max(self.current_index - 10, 0)
+
+        self.show_image(new_idx)
+        self.update_hud()
+
 
     def increase_speed(self, event: tk.Event | None = None) -> None: 
         '''
@@ -1327,8 +1377,9 @@ class ImageSlideshowApp:
         shortcuts = [
             "Spc: Play/Pause", "←/→: Prev/Next", "Q/Esc: Quit", "H: Toggle Help",
             "S: Shuffle", "T: Sort(Time)", "J: Jump", "F: Fullscreen",
-            "+/-: Speed", "L/K: Brightness", "I: Image Info", "B: Loop",
-            "A: AutoStop", "W: AlwaysOnTop", "Z: Favorite ★", "Y: Yoink (macOS)"
+            "↑/↓: Jump ±10", "+/-: Speed", "L/K: Brightness", "I: Image Info",
+            "B: Loop", "A: AutoStop", "W: AlwaysOnTop", "Z: Favorite ★",
+            "Y: Yoink (macOS)"
         ]
         
         lines = []
