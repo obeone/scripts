@@ -105,9 +105,10 @@ class ImageSlideshowApp:
         self._gif_animation_after_id: str | None = None # For managing GIF frame updates
 
         # Initialize attributes for GIF animation state
-        self._animate_gif_frames: list[ImageTk.PhotoImage] = []
+        self._animate_gif_frames: list[ImageTk.PhotoImage | tk.PhotoImage] = []
         self._animate_gif_durations: list[int] = []
         self._animate_gif_idx: int = 0
+        self._current_photo_ref: ImageTk.PhotoImage | tk.PhotoImage | None = None  # Strong reference for current image
 
         self.load_icons() # Load any UI icons (currently placeholder)
         self.load_images() # Discover and list all image files
@@ -142,9 +143,9 @@ class ImageSlideshowApp:
         self.window.bind('<space>', self.toggle_timer)
         self.window.bind('<Right>', self.next_image)
         self.window.bind('<Left>', self.previous_image)
-        # Jump forward/backward by 10 images
-        self.window.bind('<Up>', self.jump_backward_ten)
-        self.window.bind('<Down>', self.jump_forward_ten)
+        # Jump forward/backward by 10 images (intuitive direction)
+        self.window.bind('<Up>', self.jump_forward_ten)    # Up arrow = forward/next
+        self.window.bind('<Down>', self.jump_backward_ten) # Down arrow = backward/previous
         self.window.bind('<MouseWheel>', self.on_scroll) # Scroll for next/prev
         self.window.bind('<Button-1>', self.on_click)    # Left-click to toggle play/pause
 
@@ -550,8 +551,11 @@ class ImageSlideshowApp:
             self.canvas.delete("all") # Clear canvas of previous image, HUD, info
 
             # Handle animated GIFs
-            if getattr(pil_image, "is_animated", False) and pil_image.n_frames > 1:
-                logger.debug(f"Processing animated GIF: {image_path.name} ({pil_image.n_frames} frames)")
+            # Safely check for animated GIF properties
+            is_animated = getattr(pil_image, "is_animated", False)
+            n_frames = getattr(pil_image, "n_frames", 1)
+            if is_animated and n_frames > 1:
+                logger.debug(f"Processing animated GIF: {image_path.name} ({n_frames} frames)")
                 self._animate_gif_frames = []
                 self._animate_gif_durations = []
                 for frame_pil in ImageSequence.Iterator(pil_image):
@@ -559,8 +563,14 @@ class ImageSlideshowApp:
                     frame_rgba = frame_pil.copy().convert("RGBA") # Ensure RGBA for PhotoImage
                     frame_resized = self.resize_image(frame_rgba, canvas_width, canvas_height)
                     frame_adjusted = self.adjust_brightness(frame_resized) # Apply brightness to each frame
-                    self._animate_gif_frames.append(ImageTk.PhotoImage(frame_adjusted))
-                    self._animate_gif_durations.append(frame_pil.info.get('duration', 100)) # Frame duration
+                    
+                    # Use robust PhotoImage creation for GIF frames
+                    frame_photo = self._create_photoimage_robust(frame_adjusted)
+                    if frame_photo:
+                        self._animate_gif_frames.append(frame_photo)
+                        self._animate_gif_durations.append(frame_pil.info.get('duration', 100)) # Frame duration
+                    else:
+                        logger.warning(f"Failed to create PhotoImage for GIF frame, skipping frame")
                 
                 if self._animate_gif_frames:
                     self._animate_gif_idx = 0 # Reset frame counter
@@ -604,7 +614,9 @@ class ImageSlideshowApp:
         # Schedule the next image if the timer is running and not currently in a GIF animation loop
         # (GIF loop handles its own timing and can trigger next_image_auto upon completion)
         if self.timer_running and not (hasattr(self, '_gif_animation_after_id') and self._gif_animation_after_id) :
-             if not (getattr(pil_image, "is_animated", False) and pil_image.n_frames > 1): # If not a GIF currently animating
+             is_animated = getattr(pil_image, "is_animated", False)
+             n_frames = getattr(pil_image, "n_frames", 1)
+             if not (is_animated and n_frames > 1): # If not a GIF currently animating
                  self.after_id = self.window.after(int(self.delay * 1000), self.next_image_auto)
 
 
@@ -612,6 +624,7 @@ class ImageSlideshowApp:
         '''
         Converts a PIL Image to PhotoImage and displays it on the canvas.
         The image is centered on the canvas.
+        Uses multiple fallback methods to handle PIL/Tkinter compatibility issues.
 
         Args:
             image (Image.Image): The PIL Image object to display (already resized and brightness-adjusted).
@@ -619,15 +632,143 @@ class ImageSlideshowApp:
             canvas_height (int): The current height of the canvas.
         '''
         try:
-            # Convert PIL Image to Tkinter PhotoImage
-            photo = ImageTk.PhotoImage(image)
-            # Display image on canvas, centered
-            self.canvas.create_image(canvas_width // 2, canvas_height // 2, image=photo, anchor=tk.CENTER, tags="image")
-            # IMPORTANT: Keep a reference to the PhotoImage to prevent garbage collection
-            self.canvas.image = photo 
+            # Ensure image is in a compatible mode for PhotoImage
+            # PhotoImage works best with RGBA or RGB modes
+            if image.mode not in ['RGB', 'RGBA']:
+                if image.mode == 'P' and 'transparency' in image.info:
+                    display_image = image.convert('RGBA')
+                else:
+                    display_image = image.convert('RGB')
+            else:
+                display_image = image
+            
+            # Try to create PhotoImage with multiple fallback methods
+            photo = self._create_photoimage_robust(display_image)
+            
+            if photo:
+                # Display image on canvas, centered
+                self.canvas.create_image(canvas_width // 2, canvas_height // 2, image=photo, anchor=tk.CENTER, tags="image")
+                
+                # CRITICAL: Keep a strong reference to the PhotoImage to prevent garbage collection
+                # Store it as an instance attribute rather than canvas attribute
+                self._current_photo_ref = photo
+            else:
+                # If all methods failed, display error message
+                raise Exception("All PhotoImage creation methods failed")
+            
         except Exception as e:
             # Log error if PhotoImage creation or display fails
             logger.error(f"Error creating or displaying static PhotoImage: {e}", exc_info=True)
+            # Display error message on canvas
+            if canvas_width > 100 and canvas_height > 50:
+                self.canvas.create_text(
+                    canvas_width // 2, canvas_height // 2,
+                    text="Error displaying image", fill="red",
+                    font=("Helvetica", 16, "bold"), anchor=tk.CENTER, tags="image"
+                )
+
+    def _create_photoimage_robust(self, image: Image.Image):
+        '''
+        Creates a PhotoImage using multiple fallback methods to handle compatibility issues.
+        Uses a smarter approach that detects problematic systems and skips known failing methods.
+        
+        Args:
+            image (Image.Image): The PIL Image to convert.
+            
+        Returns:
+            PhotoImage object or None if all methods fail.
+        '''
+        # Check if we've already detected ImageTk.PhotoImage issues
+        if not hasattr(self, '_imagetk_working'):
+            # Test ImageTk.PhotoImage with a minimal image first
+            try:
+                test_img = Image.new('RGB', (1, 1), color='white')
+                test_photo = ImageTk.PhotoImage(test_img)
+                # If we get here, ImageTk.PhotoImage works
+                self._imagetk_working = True
+                logger.debug("ImageTk.PhotoImage compatibility confirmed")
+            except Exception as e:
+                self._imagetk_working = False
+                logger.warning(f"ImageTk.PhotoImage compatibility issue detected: {e}")
+        
+        # Method 1: Try ImageTk.PhotoImage only if it's known to work
+        if self._imagetk_working:
+            try:
+                logger.debug("Using confirmed working ImageTk.PhotoImage")
+                return ImageTk.PhotoImage(image)
+            except Exception as e:
+                logger.warning(f"ImageTk.PhotoImage failed unexpectedly: {e}")
+                self._imagetk_working = False  # Mark as broken for future calls
+        
+        # Method 2: Try with BytesIO and tk.PhotoImage (preferred fallback)
+        try:
+            logger.debug("Using BytesIO fallback for PhotoImage creation")
+            import io
+            import base64
+            
+            # Convert PIL image to bytes
+            working_image = image
+            if image.mode == 'RGBA':
+                # For RGBA, we need to handle transparency
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                background.paste(image, mask=image.split()[-1] if len(image.split()) == 4 else None)
+                working_image = background
+            elif image.mode != 'RGB':
+                working_image = image.convert('RGB')
+            
+            # Save to BytesIO as PNG
+            bio = io.BytesIO()
+            working_image.save(bio, format='PNG')
+            bio.seek(0)
+            
+            # Create tk.PhotoImage from PNG data
+            photo = tk.PhotoImage(data=base64.b64encode(bio.getvalue()))
+            logger.debug("BytesIO fallback successful")
+            return photo
+            
+        except Exception as e:
+            logger.warning(f"BytesIO fallback failed: {e}")
+        
+        # Method 3: Try with temporary file approach (last resort)
+        try:
+            logger.debug("Using temporary file fallback for PhotoImage creation")
+            import tempfile
+            import os
+            
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                temp_path = tmp_file.name
+            
+            # Ensure RGB mode for saving
+            working_image = image
+            if image.mode == 'RGBA':
+                background = Image.new('RGB', image.size, (255, 255, 255))
+                background.paste(image, mask=image.split()[-1] if len(image.split()) == 4 else None)
+                working_image = background
+            elif image.mode != 'RGB':
+                working_image = image.convert('RGB')
+            
+            # Save image to temporary file
+            working_image.save(temp_path, 'PNG')
+            
+            # Load with tk.PhotoImage
+            photo = tk.PhotoImage(file=temp_path)
+            
+            # Clean up temporary file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass  # Ignore cleanup errors
+            
+            logger.debug("Temporary file fallback successful")
+            return photo
+            
+        except Exception as e:
+            logger.warning(f"Temporary file fallback failed: {e}")
+        
+        # All methods failed
+        logger.error("All PhotoImage creation methods failed")
+        return None
 
 
     def animate_gif_next_frame(self) -> None:
@@ -663,8 +804,8 @@ class ImageSlideshowApp:
                 self.canvas.winfo_width() // 2, self.canvas.winfo_height() // 2,
                 image=current_frame_photoimage, anchor=tk.CENTER, tags="image"
             )
-            # Keep a reference to the current frame's PhotoImage
-            self.canvas.image = current_frame_photoimage
+            # Keep a strong reference to the current frame's PhotoImage
+            self._current_photo_ref = current_frame_photoimage
 
         # Move to the next frame index, looping if necessary
         self._animate_gif_idx = (self._animate_gif_idx + 1) % len(self._animate_gif_frames)
@@ -730,7 +871,13 @@ class ImageSlideshowApp:
         new_height = max(1, new_height)
 
         # Select resampling filter (LANCZOS is good for downscaling)
-        resample_filter = Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS # Pillow 9.1.0+
+        try:
+            # Try the modern way first (Pillow 10.0.0+)
+            resample_filter = Image.Resampling.LANCZOS
+        except AttributeError:
+            # Fallback: use the integer constant directly
+            # LANCZOS constant value is 1 in all Pillow versions
+            resample_filter = 1  # LANCZOS constant value
         
         try:
             #logger.debug(f"Resizing image from {image.size} to ({new_width}, {new_height})")
