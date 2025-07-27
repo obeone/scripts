@@ -1,6 +1,6 @@
 [project]
 name = "slideshow"
-version = "0.2.0"
+version = "0.3.1"
 description = "A feature-rich image slideshow application with Tkinter."
 readme = "README.md"
 requires-python = ">=3.9,<=3.11"
@@ -22,3 +22,10 @@ packages = ["slideshow"]
 
 [project.scripts]
 slideshow = "slideshow.__main__:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-mock",
+    "pytest-cov",
+]
