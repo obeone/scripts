@@ -1,20 +1,34 @@
 #!/usr/bin/env python3
+"""
+A command-line tool to inspect token usage and estimated cost for OpenAI projects.
+
+This script fetches usage data from the OpenAI API, calculates costs based on a
+predefined pricing table, and displays the results in a structured, readable format.
+"""
+
+import argparse
+import os
+import sys
+from datetime import datetime, timedelta, timezone
 
 import requests
-from datetime import datetime, timezone, timedelta
 from prettytable import PrettyTable
 from termcolor import colored
-import os
-import argparse
-import sys  # For sys.stderr
 
+# ==============================================================================
 # API Configuration
+# ==============================================================================
+
 API_BASE_URL_PROJECTS = "https://api.openai.com/v1/organization/projects"
 API_BASE_URL_PROJECT_API_KEYS = f"{API_BASE_URL_PROJECTS}/{{project_id}}/api_keys"
 API_BASE_URL_USAGE_COMPLETIONS = "https://api.openai.com/v1/organization/usage/completions"
 
-# Define pricing centrally for easy updates
-# Prices are in cents per 1K tokens, except where noted.
+# ==============================================================================
+# Pricing Configuration
+# ==============================================================================
+
+# Prices are defined in cents per 1,000 tokens, unless otherwise specified in comments.
+# This centralized dictionary allows for easy updates as OpenAI pricing evolves.
 PRICING = {
     # ==== Text models ====
     "gpt-5": {
@@ -362,33 +376,29 @@ PRICING = {
 
 
 def fetch_all_api_keys(project_id: str, api_key: str) -> dict:
-    '''
-    Fetch all API keys for the project, handling pagination.
+    """
+    Fetch all API keys for a given project, handling pagination.
 
     Args:
-        project_id (str): The project ID to query.
-        api_key (str): The API key for authentication.
+        project_id: The ID of the project to query.
+        api_key: The admin API key for authentication.
 
     Returns:
-        dict: A dictionary mapping API key IDs to their names.
+        A dictionary mapping API key IDs to their names.
 
     Raises:
-        Exception: If the API request fails or JSON decoding fails.
-    '''
+        Exception: If the API request fails or the JSON response is invalid.
+    """
     url = API_BASE_URL_PROJECT_API_KEYS.format(project_id=project_id)
     headers = {"Authorization": f"Bearer {api_key}"}
     api_keys_map = {}
     params = {"limit": 100}
-    current_request_url = url  # Start with the base URL
+    current_request_url = url
 
-    # Loop as long as there's a URL to call (handles full next URLs too)
     while current_request_url:
         try:
-            # If current_request_url is the base, params are used.
-            # If current_request_url is a full next_page URL, params might be embedded or empty.
             active_params = params if current_request_url == url else None
-            response = requests.get(
-                current_request_url, headers=headers, params=active_params)
+            response = requests.get(current_request_url, headers=headers, params=active_params)
             response.raise_for_status()
             data = response.json()
         except requests.exceptions.HTTPError as http_err:
@@ -397,21 +407,17 @@ def fetch_all_api_keys(project_id: str, api_key: str) -> dict:
             print(f"DEBUG: Failed PARAMS: {active_params}", file=sys.stderr)
             raise Exception(error_message) from http_err
         except requests.exceptions.JSONDecodeError as json_err:
-            raise Exception(
-                f"Failed to decode JSON response for API keys: {response.text}") from json_err
+            raise Exception(f"Failed to decode JSON response for API keys: {response.text}") from json_err
         except requests.exceptions.RequestException as req_err:
-            raise Exception(
-                f"Request failed while fetching API keys: {req_err}") from req_err
+            raise Exception(f"Request failed while fetching API keys: {req_err}") from req_err
 
         for key_data in data.get('data', []):
-            api_keys_map[key_data['id']] = key_data.get(
-                'name', f"Unnamed Key ({key_data['id'][:4]}...)")
+            api_keys_map[key_data['id']] = key_data.get('name', f"Unnamed Key ({key_data['id'][:4]}...)")
 
         next_cursor = data.get('pagination', {}).get('next_cursor')
         if not next_cursor:
             break
 
-        # Prepare for next iteration: always use the base URL with the cursor
         current_request_url = url
         params = {"limit": 100, "cursor": next_cursor}
 
@@ -419,22 +425,23 @@ def fetch_all_api_keys(project_id: str, api_key: str) -> dict:
 
 
 def calculate_costs(usage: dict, model_name: str) -> dict:
-    '''
-    Calculate the cost based on usage and pricing for a specific model.
-    Handles costs for tokens, minutes, characters, and images.
+    """
+    Calculate the cost based on usage data and pricing for a specific model.
+
+    This function handles costs for various metrics including tokens, minutes,
+    characters, and images.
 
     Args:
-        usage (dict): Dictionary containing usage data.
-        model_name (str): Name of the model for pricing reference.
+        usage: A dictionary containing usage data (e.g., 'input_tokens').
+        model_name: The name of the model to look up in the PRICING table.
 
     Returns:
-        dict: A dictionary with calculated costs in cents.
-    '''
+        A dictionary containing the calculated costs in cents for different metrics.
+    """
     model_pricing = PRICING.get(model_name)
     if not model_pricing:
         if model_name and model_name.lower() != "unknown":
-            print(
-                f"Warning: Pricing for model '{model_name}' not found. Costs will be $0.", file=sys.stderr)
+            print(f"Warning: Pricing for model '{model_name}' not found. Costs will be $0.", file=sys.stderr)
         return {}
 
     costs = {}
@@ -445,12 +452,12 @@ def calculate_costs(usage: dict, model_name: str) -> dict:
         costs['output_cost'] = (usage['output_tokens'] / 1000.0) * model_pricing['output']
     if 'cached_input_tokens' in usage and 'cached_input' in model_pricing:
         costs['cached_input_cost'] = (usage['cached_input_tokens'] / 1000.0) * model_pricing['cached_input']
-    
+
     # Time-based costs (per minute)
     if 'minute' in usage and 'minute' in model_pricing:
         # Cost is in dollars per minute, convert to cents
         costs['minute_cost'] = usage['minute'] * model_pricing['minute'] * 100.0
-        
+
     # Character-based costs
     if 'characters' in usage and 'character' in model_pricing:
         # Cost is in dollars per 1M characters, convert to cents
@@ -460,36 +467,40 @@ def calculate_costs(usage: dict, model_name: str) -> dict:
     if 'num_images' in usage and 'image' in model_pricing:
         # Cost is in dollars per image, convert to cents
         costs['image_cost'] = usage['num_images'] * model_pricing['image'] * 100.0
-        
+
     return costs
 
 
-def fetch_usage_details(project_id: str, api_key: str, api_keys_map: dict,
-                        start_date_str: str | None = None,
-                        end_date_str: str | None = None) -> dict:
-    '''
-    Fetch usage details for a given project and date range, including API key names, handling pagination.
+def fetch_usage_details(
+    project_id: str,
+    api_key: str,
+    api_keys_map: dict,
+    start_date_str: str | None = None,
+    end_date_str: str | None = None
+) -> dict:
+    """
+    Fetch usage details for a project and date range, handling pagination.
 
     Args:
-        project_id (str): The project ID to query usage for.
-        api_key (str): The API key for authentication.
-        api_keys_map (dict): A dictionary mapping API key IDs to their names.
-        start_date_str (str | None): Optional start date in YYYY-MM-DD format.
-                                     Defaults to the start of the current month.
-        end_date_str (str | None): Optional end date in YYYY-MM-DD format.
-                                   Defaults to the end of the current month.
+        project_id: The project ID to query usage for.
+        api_key: The admin API key for authentication.
+        api_keys_map: A dictionary mapping API key IDs to their names.
+        start_date_str: Optional start date in 'YYYY-MM-DD' format.
+                        Defaults to the start of the current month.
+        end_date_str: Optional end date in 'YYYY-MM-DD' format.
+                      Defaults to the end of the current month.
 
     Returns:
-        dict: A dictionary mapping dates (YYYY-MM-DD) to lists of usage details.
+        A dictionary mapping dates ('YYYY-MM-DD') to lists of usage details.
 
     Raises:
-        Exception: If the API request fails, JSON decoding fails, or date parsing fails.
-        ValueError: If start_date is after end_date.
-    '''
+        Exception: If an API request fails, JSON decoding fails, or date parsing fails.
+        ValueError: If the start date is after the end date.
+    """
     headers = {"Authorization": f"Bearer {api_key}"}
     now = datetime.now(timezone.utc)
 
-    # If start_date_str is None, use the first day of the current month
+    # Determine start date
     if not start_date_str:
         start_time_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
@@ -498,15 +509,13 @@ def fetch_usage_details(project_id: str, api_key: str, api_keys_map: dict,
         except ValueError as ve:
             raise Exception(f"Invalid start date format: {ve}") from ve
 
-    # If end_date_str is None, use the last day and last second of the current month
+    # Determine end date
     if not end_date_str:
-        # Find the last day of the month
         if now.month == 12:
-            next_month = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            next_month = now.replace(year=now.year + 1, month=1, day=1)
         else:
-            next_month = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_day_of_month = (next_month - timedelta(seconds=1)).replace(tzinfo=timezone.utc)
-        end_time_dt = last_day_of_month
+            next_month = now.replace(month=now.month + 1, day=1)
+        end_time_dt = (next_month - timedelta(seconds=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
     else:
         try:
             end_time_dt = datetime.strptime(end_date_str, '%Y-%m-%d').replace(
@@ -522,7 +531,6 @@ def fetch_usage_details(project_id: str, api_key: str, api_keys_map: dict,
     end_time_ts = int(end_time_dt.timestamp())
 
     usages_by_date = {}
-    # Initial params for the first request
     current_params = {
         "project_id": project_id,
         "start_time": start_time_ts,
@@ -530,41 +538,23 @@ def fetch_usage_details(project_id: str, api_key: str, api_keys_map: dict,
         "group_by": "api_key_id,model",
         "bucket_width": "1d"
     }
-    # Note: The original logic for start_time_dt and end_time_dt from lines 355-370
-    # has been consolidated and corrected above.
-    # The timestamp calculations (original lines 372-373 and 408-409) are now correctly placed
-    # after the final determination of start_time_dt and end_time_dt.
-
-
-
-
-
-
-
-
-
-
     current_url = API_BASE_URL_USAGE_COMPLETIONS
 
     while current_url:
         try:
-            response = requests.get(
-                current_url, headers=headers, params=current_params)
+            response = requests.get(current_url, headers=headers, params=current_params)
             response.raise_for_status()
             data = response.json()
         except requests.exceptions.HTTPError as http_err:
             error_message = f"HTTP error fetching usage data: {http_err} - Response: {response.text}\nURL: {response.url}\nParams: {current_params}"
             raise Exception(error_message) from http_err
         except requests.exceptions.JSONDecodeError as json_err:
-            raise Exception(
-                f"Failed to decode JSON response for usage data: {response.text}") from json_err
+            raise Exception(f"Failed to decode JSON response for usage data: {response.text}") from json_err
         except requests.exceptions.RequestException as req_err:
-            raise Exception(
-                f"Request failed while fetching usage data: {req_err}") from req_err
+            raise Exception(f"Request failed while fetching usage data: {req_err}") from req_err
 
         for bucket in data.get('data', []):
-            bucket_start_time_str = datetime.fromtimestamp(
-                bucket.get('start_time'), timezone.utc).strftime('%Y-%m-%d')
+            bucket_start_time_str = datetime.fromtimestamp(bucket.get('start_time'), timezone.utc).strftime('%Y-%m-%d')
             if bucket_start_time_str not in usages_by_date:
                 usages_by_date[bucket_start_time_str] = []
 
@@ -579,86 +569,88 @@ def fetch_usage_details(project_id: str, api_key: str, api_keys_map: dict,
 
         next_page_info = data.get('next_page')
         if not next_page_info:
-            break  # No more pages
+            break
 
         if next_page_info.startswith("http"):
             current_url = next_page_info
             current_params = None  # Params are included in the full URL
         else:
-            # Assuming it's a token for the 'page' parameter (OpenAI specific pagination)
-            # Preserve original parameters and add/update the page token
+            # Handle pagination via page token
             current_params = {
                 "project_id": project_id,
                 "start_time": start_time_ts,
                 "end_time": end_time_ts,
                 "group_by": "api_key_id,model",
                 "bucket_width": "1d",
-                "page": next_page_info  # Add or update the page token
+                "page": next_page_info
             }
-            current_url = API_BASE_URL_USAGE_COMPLETIONS  # Reset to base URL with new params
+            current_url = API_BASE_URL_USAGE_COMPLETIONS
 
     return usages_by_date
 
 
-def fetch_project_usage(project_id: str, api_key: str,
-                        start_date_str: str | None = None,
-                        end_date_str: str | None = None) -> dict:
-    '''
-    Fetch usage details for a given project for a specified date range.
+def fetch_project_usage(
+    project_id: str,
+    api_key: str,
+    start_date_str: str | None = None,
+    end_date_str: str | None = None
+) -> dict:
+    """
+    Fetch all usage details for a single project for a specified date range.
+
+    This function first fetches all API keys for the project and then retrieves
+    the associated usage data.
 
     Args:
-        project_id (str): The project ID to query usage for.
-        api_key (str): The API key for authentication.
-        start_date_str (str | None): Optional start date in YYYY-MM-DD format.
-        end_date_str (str | None): Optional end date in YYYY-MM-DD format.
+        project_id: The project ID to query usage for.
+        api_key: The admin API key for authentication.
+        start_date_str: Optional start date in 'YYYY-MM-DD' format.
+        end_date_str: Optional end date in 'YYYY-MM-DD' format.
 
     Returns:
-        dict: A dictionary mapping dates to usage details.
-    '''
+        A dictionary mapping dates to usage details.
+    """
     api_keys_map = fetch_all_api_keys(project_id, api_key)
     return fetch_usage_details(project_id, api_key, api_keys_map, start_date_str, end_date_str)
 
 
 def list_projects(api_key: str, return_list: bool = False) -> list | None:
-    '''
+    """
     Fetch and display a list of available OpenAI projects.
 
     Args:
-        api_key (str): The API key for authentication.
-        return_list (bool, optional): If True, returns the list of projects
-                                      instead of printing. Defaults to False.
+        api_key: The admin API key for authentication.
+        return_list: If True, returns the list of project dictionaries
+                     instead of printing to the console. Defaults to False.
 
     Returns:
-        list | None: A list of project dictionaries if return_list is True, otherwise None.
+        A list of project dictionaries if return_list is True, otherwise None.
 
     Raises:
-        Exception: If the API request fails or JSON decoding fails.
-    '''
+        Exception: If the API request fails or the JSON response is invalid.
+    """
     all_projects = []
-    # Initial params for the first request
     current_params = {"limit": 100}
     headers = {"Authorization": f"Bearer {api_key}"}
     current_url = API_BASE_URL_PROJECTS
 
     try:
         while current_url:
-            response = requests.get(
-                current_url, headers=headers, params=current_params)
+            response = requests.get(current_url, headers=headers, params=current_params)
             response.raise_for_status()
             data = response.json()
 
             projects_page = data.get('data', [])
             all_projects.extend(projects_page)
 
-            # Pagination for projects uses 'has_more' and 'after' with the last ID
             if data.get('has_more') and projects_page:
                 last_id = projects_page[-1].get('id')
                 if not last_id:
                     break
                 current_params = {'limit': 100, 'after': last_id}
-                current_url = API_BASE_URL_PROJECTS  # Stay on base URL, update params
+                current_url = API_BASE_URL_PROJECTS
             else:
-                break  # No more pages
+                break
 
         if return_list:
             return all_projects
@@ -668,44 +660,39 @@ def list_projects(api_key: str, return_list: bool = False) -> list | None:
                 return None
             print("Available Projects:")
             for project in all_projects:
-                print(
-                    f"- ID: {project.get('id')}, Name: {project.get('name')}")
+                print(f"- ID: {project.get('id')}, Name: {project.get('name')}")
             return None
     except requests.exceptions.HTTPError as http_err:
         error_message = f"HTTP error fetching projects: {http_err} - Response: {response.text}"
         raise Exception(error_message) from http_err
     except requests.exceptions.JSONDecodeError as json_err:
-        raise Exception(
-            f"Failed to decode JSON response for projects: {response.text}") from json_err
+        raise Exception(f"Failed to decode JSON response for projects: {response.text}") from json_err
     except requests.exceptions.RequestException as req_err:
-        raise Exception(
-            f"Request failed while fetching projects: {req_err}") from req_err
+        raise Exception(f"Request failed while fetching projects: {req_err}") from req_err
 
 
 def get_sort_key_tuple(usage_item: dict, criteria_list: list[str], project_names_map: dict) -> tuple:
-    '''
-    Generate a sort key tuple for a usage item based on a list of criteria.
-    Secondary sort criteria are added automatically for stability.
+    """
+    Generate a sort key for a usage item based on specified criteria.
+
+    A stable secondary sort order is automatically applied to ensure consistent
+    output.
 
     Args:
-        usage_item (dict): The usage data item.
-        criteria_list (list[str]): User-specified sort criteria (e.g., ['project', 'day']).
-        project_names_map (dict): Mapping of project IDs to names.
+        usage_item: The usage data dictionary.
+        criteria_list: A list of user-specified sort criteria (e.g., ['project', 'day']).
+        project_names_map: A mapping of project IDs to names.
 
     Returns:
-        tuple: A tuple of values to be used for sorting.
-    '''
+        A tuple of values suitable for use as a sort key.
+    """
     key_parts = []
-
-    # Define all possible values from the usage_item once
     project_id_val = usage_item.get('project_id', '')
-    project_name_val = project_names_map.get(
-        project_id_val, project_id_val)  # Use name for sorting if available
+    project_name_val = project_names_map.get(project_id_val, project_id_val)
     date_val = usage_item.get('date', '')
     key_name_val = usage_item.get('api_key_name', '')
     model_val = usage_item.get('model', '')
 
-    # Map criterion string to its corresponding value
     criteria_to_value_map = {
         'project': project_name_val,
         'day': date_val,
@@ -715,43 +702,34 @@ def get_sort_key_tuple(usage_item: dict, criteria_list: list[str], project_names
 
     # Add parts based on user-specified criteria order
     for criterion in criteria_list:
-        key_parts.append(criteria_to_value_map.get(
-            criterion.lower(), ''))  # .lower() for safety
+        key_parts.append(criteria_to_value_map.get(criterion.lower(), ''))
 
-    # Add remaining criteria (not specified by user) in a fixed order for stable sort
-    # This ensures that if user groups by e.g. 'project', items within the same project are then sorted by day, then key, etc.
-    all_possible_criteria_in_stable_order = ['project', 'day', 'key', 'model']
-    for crit in all_possible_criteria_in_stable_order:
-        if crit not in criteria_list:  # Only add if not already added by user's primary criteria
-            # Check if the value itself needs to be added, not the criterion string
-            if crit == 'project' and 'project' not in criteria_list:
-                key_parts.append(project_name_val)
-            elif crit == 'day' and 'day' not in criteria_list:
-                key_parts.append(date_val)
-            elif crit == 'key' and 'key' not in criteria_list:
-                key_parts.append(key_name_val)
-            elif crit == 'model' and 'model' not in criteria_list:
-                key_parts.append(model_val)
+    # Add remaining criteria for a stable sort
+    all_possible_criteria = ['project', 'day', 'key', 'model']
+    for crit in all_possible_criteria:
+        if crit not in criteria_list:
+            key_parts.append(criteria_to_value_map[crit])
 
     return tuple(key_parts)
 
 
 def display_results(all_usage_details: list, project_names: dict, group_by_criteria: list[str]) -> None:
-    '''
+    """
     Display usage data in a formatted table, grouped and sorted as specified.
-    Subtotals are displayed for the first criterion in group_by_criteria.
+
+    Subtotals are calculated and displayed based on the primary grouping criterion.
 
     Args:
-        all_usage_details (list): A list of dictionaries, where each dictionary contains
-                                  usage details for a specific model/API key combination
-                                  on a given date, including 'date' and 'project_id'.
-        project_names (dict): A dictionary mapping project IDs to project names.
-        group_by_criteria (list[str]): The criteria for grouping and sorting results 
-                                     (e.g., ['project', 'day']).
-    '''
+        all_usage_details: A list of dictionaries containing usage details.
+        project_names: A dictionary mapping project IDs to project names.
+        group_by_criteria: The criteria for grouping and sorting results (e.g., ['project', 'day']).
+    """
+    if not all_usage_details:
+        print("No usage data to display.")
+        return
+
     table = PrettyTable()
-    table.field_names = ["Date", "Project", "Model", "API Key",
-                         "Input (¢)", "Output (¢)", "Cached (¢)", "Other (¢)", "Total (¢)"]
+    table.field_names = ["Date", "Project", "Model", "API Key", "Input (¢)", "Output (¢)", "Cached (¢)", "Other (¢)", "Total (¢)"]
     table.align["Input (¢)"] = "r"
     table.align["Output (¢)"] = "r"
     table.align["Cached (¢)"] = "r"
@@ -760,42 +738,27 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
 
     grand_total_cost = 0.0
 
-    if not all_usage_details:
-        print("No usage data to display.")
-        return
+    sorted_usage_details = sorted(all_usage_details, key=lambda x: get_sort_key_tuple(x, group_by_criteria, project_names))
 
-    # Sort details based on the full criteria list for detailed row order
-    # The get_sort_key_tuple function handles creating a comprehensive sort key
-    sorted_usage_details = sorted(all_usage_details, key=lambda x: get_sort_key_tuple(
-        x, group_by_criteria, project_names))
-
-    # Determine the primary grouping criterion for subtotals
-    # Default to day if empty, though argparse default helps
     primary_group_criterion = group_by_criteria[0] if group_by_criteria else "day"
-
     group_label_prefix_map = {
         "project": "Total for Project",
         "day": "Total for day",
         "key": "Total for API Key",
         "model": "Total for Model"
     }
-    group_label_prefix = group_label_prefix_map.get(
-        primary_group_criterion, f"Total for {primary_group_criterion}")
+    group_label_prefix = group_label_prefix_map.get(primary_group_criterion, f"Total for {primary_group_criterion}")
 
     current_primary_group_id_val = None
     current_primary_group_display_name = ""
     current_group_total_cost = 0.0
 
     for usage in sorted_usage_details:
-        item_primary_group_id_val = None
-        item_primary_group_display_name = ""
-
-        # Determine the ID and display name for the current item's *primary* group
+        # Determine the ID and display name for the current item's primary group
         if primary_group_criterion == 'project':
             project_id = usage.get('project_id', 'unknown_project')
             item_primary_group_id_val = project_id
-            item_primary_group_display_name = project_names.get(
-                project_id, project_id)
+            item_primary_group_display_name = project_names.get(project_id, project_id)
         elif primary_group_criterion == 'key':
             api_key_name = usage.get('api_key_name', 'Unknown')
             item_primary_group_id_val = api_key_name
@@ -809,28 +772,25 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
             item_primary_group_id_val = date_str_group
             item_primary_group_display_name = date_str_group
 
-        if current_primary_group_id_val is None:  # First item
+        if current_primary_group_id_val is None:
             current_primary_group_id_val = item_primary_group_id_val
             current_primary_group_display_name = item_primary_group_display_name
 
-        if item_primary_group_id_val != current_primary_group_id_val:  # Primary group has changed
+        if item_primary_group_id_val != current_primary_group_id_val:
             table.add_row([
-                colored(f"{group_label_prefix} {current_primary_group_display_name}",
-                        'magenta', attrs=['bold']),
-                "", "", "", "", "", "", "", # Span across other columns
-                colored(f"{current_group_total_cost:.4f} ¢",
-                        'magenta', attrs=["bold"])
+                colored(f"{group_label_prefix} {current_primary_group_display_name}", 'magenta', attrs=['bold']),
+                "", "", "", "", "", "", "",
+                colored(f"{current_group_total_cost:.4f} ¢", 'magenta', attrs=["bold"])
             ])
             table.add_divider()
-            current_group_total_cost = 0.0  # Reset for new group
+            current_group_total_cost = 0.0
             current_primary_group_id_val = item_primary_group_id_val
             current_primary_group_display_name = item_primary_group_display_name
 
         # Extract details for the current row
         date_str_row = usage.get('date', 'unknown_date')
         project_id_row = usage.get('project_id', 'unknown_project')
-        project_name_disp_row = project_names.get(
-            project_id_row, project_id_row)
+        project_name_disp_row = project_names.get(project_id_row, project_id_row)
         model_row = usage.get('model', 'unknown_model')
         api_key_name_disp_row = usage.get('api_key_name', 'Unknown Key')
 
@@ -859,14 +819,12 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
             colored(f"{current_row_total:.4f}", color="red", attrs=["bold"])
         ])
 
-    # After the loop, add the total for the very last processed primary group
+    # Add the total for the very last processed group
     if sorted_usage_details:
         table.add_row([
-            colored(f"{group_label_prefix} {current_primary_group_display_name}",
-                    'magenta', attrs=['bold']),
+            colored(f"{group_label_prefix} {current_primary_group_display_name}", 'magenta', attrs=['bold']),
             "", "", "", "", "", "", "",
-            colored(f"{current_group_total_cost:.4f} ¢",
-                    'magenta', attrs=["bold"])
+            colored(f"{current_group_total_cost:.4f} ¢", 'magenta', attrs=["bold"])
         ])
         table.add_divider()
 
@@ -880,52 +838,44 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
 
 
 def main() -> None:
-    '''
-    Main function to fetch and display OpenAI API usage data for specific projects
-    based on command-line arguments, date range, and grouping preference.
-    '''
+    """
+    Main function to run the OpenAI usage reporting tool.
+
+    Parses command-line arguments, fetches data from the OpenAI API,
+    and displays the results.
+    """
     parser = argparse.ArgumentParser(
         description="Fetch and display OpenAI API usage data per project.",
-        # Shows default values in help
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "-l", "--list-projects", action="store_true", help="List available projects."
+        "-l", "--list-projects", action="store_true", help="List available projects and exit."
     )
     parser.add_argument(
         "-p", "--projects", nargs="+",
-        help="Specify one or more project IDs to display usage for. "
-        "If not specified, usage for all available projects will be displayed."
+        help="One or more project IDs to display usage for. If omitted, all projects are shown."
     )
     parser.add_argument(
-        "-sd", "--start-date",
-        type=str,
-        help="Start date for usage data (YYYY-MM-DD).",
-        default=None  # Default handled in fetch_usage_details to be start of current month
+        "-sd", "--start-date", type=str,
+        help="Start date for usage data (YYYY-MM-DD). Defaults to the start of the current month."
     )
     parser.add_argument(
-        "-ed", "--end-date",
-        type=str,
-        help="End date for usage data (YYYY-MM-DD).",
-        default=None  # Default handled in fetch_usage_details to be end of current month
+        "-ed", "--end-date", type=str,
+        help="End date for usage data (YYYY-MM-DD). Defaults to the end of the current month."
     )
     parser.add_argument(
-        "-gb", "--group-by",
-        type=str,
-        nargs='+',
+        "-gb", "--group-by", type=str, nargs='+',
         choices=["day", "project", "key", "model"],
         default=["day"],
-        help="Criteria to group and sort results (e.g., project day). Order matters for sorting. "
-             "Subtotals are shown for the first criterion. "
-             "Choices: 'day', 'project', 'key', 'model'.",
+        help="Criteria to group and sort results. Order matters for sorting. "
+             "Subtotals are shown for the first criterion."
     )
 
     args = parser.parse_args()
 
     api_key = os.getenv("OPENAI_ADMIN_API_KEY")
     if not api_key:
-        print("Error: OPENAI_ADMIN_API_KEY environment variable not set.",
-              file=sys.stderr)
+        print("Error: OPENAI_ADMIN_API_KEY environment variable not set.", file=sys.stderr)
         return
 
     if args.list_projects:
@@ -935,35 +885,25 @@ def main() -> None:
             print(f"Error listing projects: {e}", file=sys.stderr)
         return
 
-    # Date validation
-    parsed_start_date = args.start_date
-    if parsed_start_date:
-        try:
-            datetime.strptime(parsed_start_date, '%Y-%m-%d')
-        except ValueError:
-            print(
-                "Error: Invalid start-date format. Please use YYYY-MM-DD.", file=sys.stderr)
-            return
+    # Validate date formats early
+    try:
+        if args.start_date:
+            datetime.strptime(args.start_date, '%Y-%m-%d')
+        if args.end_date:
+            datetime.strptime(args.end_date, '%Y-%m-%d')
+        if args.start_date and args.end_date:
+            if datetime.strptime(args.start_date, '%Y-%m-%d') > datetime.strptime(args.end_date, '%Y-%m-%d'):
+                print("Error: Start date cannot be after end date.", file=sys.stderr)
+                return
+    except ValueError:
+        print("Error: Invalid date format. Please use YYYY-MM-DD.", file=sys.stderr)
+        return
 
-    parsed_end_date = args.end_date
-    if parsed_end_date:
-        try:
-            datetime.strptime(parsed_end_date, '%Y-%m-%d')
-        except ValueError:
-            print("Error: Invalid end-date format. Please use YYYY-MM-DD.",
-                  file=sys.stderr)
-            return
-
-    if parsed_start_date and parsed_end_date:
-        if datetime.strptime(parsed_start_date, '%Y-%m-%d') > datetime.strptime(parsed_end_date, '%Y-%m-%d'):
-            print("Error: Start date cannot be after end date.", file=sys.stderr)
-            return
-
+    # Determine which project IDs to fetch
     project_ids_to_fetch = []
     if args.projects:
         project_ids_to_fetch = args.projects
     else:
-        # If no projects are specified, fetch all available project IDs
         print("No projects specified with -p/--projects. Fetching usage for all available projects...")
         try:
             all_available_projects = list_projects(api_key, return_list=True)
@@ -980,59 +920,36 @@ def main() -> None:
             print(f"Error fetching list of all projects: {e}", file=sys.stderr)
             return
 
-    if not project_ids_to_fetch:  # Check if the list is empty after logic
-        print("Error: No project IDs to process. Please specify projects with -p/--projects or ensure projects are available.", file=sys.stderr)
-        # parser.print_help() # Avoid printing help here as it might be confusing if it was an API error
+    if not project_ids_to_fetch:
+        print("Error: No project IDs to process.", file=sys.stderr)
         return
 
     all_projects_usage_details = []
     project_names_map = {}
 
+    # Fetch project names for display
     try:
-        projects_list_data = list_projects(
-            api_key, return_list=True)  # Renamed to avoid conflict
+        projects_list_data = list_projects(api_key, return_list=True)
         if projects_list_data:
-            for project_info in projects_list_data:
-                project_names_map[project_info.get('id')] = project_info.get(
-                    'name', 'Unknown Project')
+            project_names_map = {p.get('id'): p.get('name', 'Unknown Project') for p in projects_list_data}
     except Exception as e:
-        print(
-            f"Warning: Could not fetch project names: {e}. Project IDs will be used.", file=sys.stderr)
+        print(f"Warning: Could not fetch project names: {e}. Project IDs will be used.", file=sys.stderr)
 
+    # Fetch usage for each project
     for project_id in project_ids_to_fetch:
-        if projects_list_data and project_id not in project_names_map:
-            print(
-                f"Warning: Project ID '{project_id}' not found in your list of available projects. Attempting to fetch anyway.", file=sys.stderr)
-        # elif not projects_list_data and project_id != DEFAULT_PROJECT_ID and DEFAULT_PROJECT_ID is not None:
-        #     print(
-        #         f"Warning: Cannot verify Project ID '{project_id}' as project list could not be fetched. Attempting to fetch anyway.", file=sys.stderr)
-        # The above warning might be less relevant now if we are iterating through fetched project_ids or user-provided ones.
-        # The check for project_id in project_names_map already covers if it was found.
-
-        print(
-            f"\nFetching usage for project: {project_names_map.get(project_id, project_id)} ({project_id})")
+        print(f"Fetching usage for project: {project_names_map.get(project_id, project_id)}...")
         try:
-            usage_data = fetch_project_usage(
-                project_id, api_key, parsed_start_date, parsed_end_date)
-            for date_str, usages_on_date in usage_data.items():
-                for usage_detail in usages_on_date:
-                    # Ensure date is at the top level for sorting
-                    usage_detail['date'] = date_str
-                    # Ensure project_id is at the top level
-                    usage_detail['project_id'] = project_id
-                    all_projects_usage_details.append(usage_detail)
-        except ValueError as ve:
-            print(
-                f"Configuration error for project {project_id}: {ve}", file=sys.stderr)
+            usage_by_date = fetch_project_usage(project_id, api_key, args.start_date, args.end_date)
+            for date, usage_list in usage_by_date.items():
+                for usage_item in usage_list:
+                    usage_item['date'] = date
+                    usage_item['project_id'] = project_id
+                    all_projects_usage_details.append(usage_item)
         except Exception as e:
-            print(
-                f"Error fetching usage for project {project_id}: {e}", file=sys.stderr)
+            print(f"Error fetching usage for project {project_id}: {e}", file=sys.stderr)
 
-    if all_projects_usage_details:
-        display_results(all_projects_usage_details,
-                        project_names_map, args.group_by)
-    else:
-        print("No usage data fetched for the specified projects, or an error occurred for all of them.")
+    # Display the consolidated results
+    display_results(all_projects_usage_details, project_names_map, args.group_by)
 
 
 if __name__ == "__main__":
