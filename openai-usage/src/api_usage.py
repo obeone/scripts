@@ -14,227 +14,349 @@ API_BASE_URL_PROJECT_API_KEYS = f"{API_BASE_URL_PROJECTS}/{{project_id}}/api_key
 API_BASE_URL_USAGE_COMPLETIONS = "https://api.openai.com/v1/organization/usage/completions"
 
 # Define pricing centrally for easy updates
-# (PRICING dictionary remains the same as in the previous version)
+# Prices are in cents per 1K tokens, except where noted.
 PRICING = {
-    # ==== Latest models ====
+    # ==== Text models ====
+    "gpt-5": {
+        "input": 0.125,         # $1.25 / 1M tokens
+        "cached_input": 0.0125, # $0.125 / 1M tokens
+        "output": 1.0,          # $10.00 / 1M tokens
+    },
+    "gpt-5-2025-08-07": {
+        "input": 0.125,         # $1.25 / 1M tokens
+        "cached_input": 0.0125, # $0.125 / 1M tokens
+        "output": 1.0,          # $10.00 / 1M tokens
+    },
+    "gpt-5-mini": {
+        "input": 0.025,         # $0.25 / 1M tokens
+        "cached_input": 0.0025, # $0.025 / 1M tokens
+        "output": 0.2,          # $2.00 / 1M tokens
+    },
+    "gpt-5-mini-2025-08-07": {
+        "input": 0.025,         # $0.25 / 1M tokens
+        "cached_input": 0.0025, # $0.025 / 1M tokens
+        "output": 0.2,          # $2.00 / 1M tokens
+    },
+    "gpt-5-nano": {
+        "input": 0.005,         # $0.05 / 1M tokens
+        "cached_input": 0.0005, # $0.005 / 1M tokens
+        "output": 0.04,         # $0.40 / 1M tokens
+    },
+    "gpt-5-nano-2025-08-07": {
+        "input": 0.005,         # $0.05 / 1M tokens
+        "cached_input": 0.0005, # $0.005 / 1M tokens
+        "output": 0.04,         # $0.40 / 1M tokens
+    },
+    "gpt-5-chat-latest": {
+        "input": 0.125,
+        "cached_input": 0.0125,
+        "output": 1.0,
+    },
     "gpt-4.1": {
-        "input": 0.2,       # $2.00 per 1M tokens => 0.2¢/1k
-        "cached_input": 0.05,  # $0.50 per 1M tokens => 0.05¢/1k
-        "output": 0.8,      # $8.00 per 1M tokens => 0.8¢/1k
+        "input": 0.2,           # $2.00 / 1M tokens
+        "cached_input": 0.05,   # $0.50 / 1M tokens
+        "output": 0.8,          # $8.00 / 1M tokens
     },
     "gpt-4.1-2025-04-14": {
-        "input": 0.2,
-        "cached_input": 0.05,
-        "output": 0.8,
+        "input": 0.2,           # $2.00 / 1M tokens
+        "cached_input": 0.05,   # $0.50 / 1M tokens
+        "output": 0.8,          # $8.00 / 1M tokens
     },
     "gpt-4.1-mini": {
-        "input": 0.04,      # $0.40/1M = 0.04¢/1k
-        "cached_input": 0.01,  # $0.10/1M = 0.01¢/1k
-        "output": 0.16,     # $1.60/1M = 0.16¢/1k
-    },
-    "gpt-4.1-mini-2025-04-14": {
-        "input": 0.04,
-        "cached_input": 0.01,
-        "output": 0.16,
+        "input": 0.04,          # $0.40 / 1M tokens
+        "cached_input": 0.01,   # $0.10 / 1M tokens
+        "output": 0.16,         # $1.60 / 1M tokens
     },
     "gpt-4.1-nano": {
-        "input": 0.01,      # $0.10/1M = 0.01¢/1k
-        "cached_input": 0.0025,  # $0.025/1M = 0.0025¢/1k
-        "output": 0.04,     # $0.40/1M = 0.04¢/1k
+        "input": 0.01,          # $0.10 / 1M tokens
+        "cached_input": 0.0025, # $0.025 / 1M tokens
+        "output": 0.04,         # $0.40 / 1M tokens
     },
-    "gpt-4.1-nano-2025-04-14": {
-        "input": 0.01,
-        "cached_input": 0.0025,
-        "output": 0.04,
-    },
-
-    # ==== GPT-4.5 Preview ====
-    "gpt-4.5-preview": {
-        "input": 7.5,         # $75.00/1M = 7.5¢/1k
-        "cached_input": 3.75,  # $37.50/1M = 3.75¢/1k
-        "output": 15.0,       # $150.00/1M = 15¢/1k
-    },
-    "gpt-4.5-preview-2025-02-27": {
-        "input": 7.5,
-        "cached_input": 3.75,
-        "output": 15.0,
-    },
-
-    # ==== GPT-4o and variants ====
     "gpt-4o": {
-        "input": 0.25,
-        "cached_input": 0.125,
-        "output": 1.0,
-    },
-    "gpt-4o-2024-08-06": {
-        "input": 0.25,        # $2.50/1M = 0.25¢/1k
-        "cached_input": 0.125,
-        "output": 1.0,
-    },
-    "gpt-4o-2024-11-20": {
-        "input": 0.25,
-        "cached_input": 0.125,
-        "output": 1.0,
+        "input": 0.25,          # $2.50 / 1M tokens
+        "cached_input": 0.125,  # $1.25 / 1M tokens
+        "output": 1.0,          # $10.00 / 1M tokens
     },
     "gpt-4o-2024-05-13": {
-        "input": 0.5,
-        "cached_input": 0.5,
-        "output": 1.5,
+        "input": 0.5,           # $5.00 / 1M tokens
+        "output": 1.5,          # $15.00 / 1M tokens
     },
-    "gpt-4o-realtime-preview-2024-12-17": {
-        "input": 0.5,         # $5.00/1M = 0.5¢/1k
-        "cached_input": 0.25,
-        "output": 2.0,        # $20.00/1M = 2¢/1k
+    "gpt-4o-audio-preview": {
+        "input": 0.25,          # $2.50 / 1M tokens
+        "output": 1.0,          # $10.00 / 1M tokens
     },
-    "gpt-4o-mini-2024-07-18": {
-        "input": 0.015,       # $0.15/1M = 0.015¢/1k
-        "cached_input": 0.0075,
-        "output": 0.06,
+    "gpt-4o-realtime-preview": {
+        "input": 0.5,           # $5.00 / 1M tokens
+        "cached_input": 0.25,   # $2.50 / 1M tokens
+        "output": 2.0,          # $20.00 / 1M tokens
     },
     "gpt-4o-mini": {
-        "input": 0.015,
-        "cached_input": 0.0075,
-        "output": 0.06,
+        "input": 0.015,         # $0.15 / 1M tokens
+        "cached_input": 0.0075, # $0.075 / 1M tokens
+        "output": 0.06,         # $0.60 / 1M tokens
     },
-    "gpt-4o-mini-realtime-preview-2024-12-17": {
-        "input": 0.06,        # $0.60/1M = 0.06¢/1k
-        "cached_input": 0.03,
-        "output": 0.24,
+    "gpt-4o-mini-audio-preview": {
+        "input": 0.015,         # $0.15 / 1M tokens
+        "output": 0.06,         # $0.60 / 1M tokens
     },
-    "gpt-4o-search-preview-2025-03-11": {
-        "input": 0.25,        # $2.50/1M = 0.25¢/1k
-        "output": 1.0,
+    "gpt-4o-mini-realtime-preview": {
+        "input": 0.06,          # $0.60 / 1M tokens
+        "cached_input": 0.03,   # $0.30 / 1M tokens
+        "output": 0.24,         # $2.40 / 1M tokens
     },
-    "gpt-4o-mini-search-preview-2025-03-11": {
-        "input": 0.015,       # $0.15/1M = 0.015¢/1k
-        "output": 0.06,
+    "o1": {
+        "input": 1.5,           # $15.00 / 1M tokens
+        "cached_input": 0.75,   # $7.50 / 1M tokens
+        "output": 6.0,          # $60.00 / 1M tokens
     },
-
-    # ==== Other recent models ====
-    "o1-2024-12-17": {
-        "input": 1.5,         # $15.00/1M = 1.5¢/1k
-        "cached_input": 0.75,
-        "output": 6.0,
+    "o1-pro": {
+        "input": 15.0,          # $150.00 / 1M tokens
+        "output": 60.0,         # $600.00 / 1M tokens
     },
-    "o1-pro-2025-03-19": {
-        "input": 15.0,        # $150.00/1M = 15¢/1k
-        "output": 60.0,
-    },
-    "o3-2025-04-16": {
-        "input": 1.0,         # $10.00/1M = 1¢/1k
-        "cached_input": 0.25,
-        "output": 4.0,
+    "o3-pro": {
+        "input": 2.0,           # $20.00 / 1M tokens
+        "output": 8.0,          # $80.00 / 1M tokens
     },
     "o3": {
-        "input": 0.5,         # $5.00/1M = 0.5¢/1k
-        "cached_input": 0.125,
-        "output": 2.0,
+        "input": 0.2,           # $2.00 / 1M tokens
+        "cached_input": 0.05,   # $0.50 / 1M tokens
+        "output": 0.8,          # $8.00 / 1M tokens
     },
-    "o3-mini-2025-01-31": {
-        "input": 0.11,        # $1.10/1M = 0.11¢/1k
-        "cached_input": 0.055,
-        "output": 0.44,
+    "o3-2025-04-16": {
+        "input": 0.2,           # $2.00 / 1M tokens
+        "cached_input": 0.05,   # $0.50 / 1M tokens
+        "output": 0.8,          # $8.00 / 1M tokens
     },
-    "o1-mini-2024-09-12": {
-        "input": 0.11,
-        "cached_input": 0.055,
-        "output": 0.44,
+    "o3-deep-research": {
+        "input": 1.0,           # $10.00 / 1M tokens
+        "cached_input": 0.25,   # $2.50 / 1M tokens
+        "output": 4.0,          # $40.00 / 1M tokens
     },
-    "o4-mini-2025-04-16": {
-        "input": 0.25,
-        "cached_input": 0.0275,
-        "output": 0.44,
+    "o4-mini": {
+        "input": 0.11,          # $1.10 / 1M tokens
+        "cached_input": 0.0275, # $0.275 / 1M tokens
+        "output": 0.44,         # $4.40 / 1M tokens
     },
-
-    # ==== Historical GPT models ====
-    "gpt-4-turbo-2024-04-09": {
-        "input": 1.0,         # $10.00/1M = 1¢/1k
-        "output": 3.0,
+    "o4-mini-deep-research": {
+        "input": 0.2,           # $2.00 / 1M tokens
+        "cached_input": 0.05,   # $0.50 / 1M tokens
+        "output": 0.8,          # $8.00 / 1M tokens
     },
-    "gpt-4-0613": {
-        "input": 3.0,         # $30.00/1M = 3¢/1k
-        "output": 6.0,
+    "o3-mini": {
+        "input": 0.11,          # $1.10 / 1M tokens
+        "cached_input": 0.055,  # $0.55 / 1M tokens
+        "output": 0.44,         # $4.40 / 1M tokens
     },
-    "gpt-4-32k": {
-        "input": 6.0,         # $60.00/1M = 6¢/1k
-        "output": 12.0,
+    "o1-mini": {
+        "input": 0.11,          # $1.10 / 1M tokens
+        "cached_input": 0.055,  # $0.55 / 1M tokens
+        "output": 0.44,         # $4.40 / 1M tokens
     },
-    "gpt-3.5-turbo-0125": {
-        "input": 0.05,        # $0.50/1M = 0.05¢/1k
-        "output": 0.15,
-    },
-    "gpt-3.5-turbo-instruct": {
-        "input": 0.15,        # $1.50/1M = 0.15¢/1k
-        "output": 0.2,        # $2.00/1M = 0.2¢/1k
-    },
-    "gpt-3.5-turbo-16k-0613": {
-        "input": 0.3,         # $3.00/1M = 0.3¢/1k
-        "output": 0.4,
-    },
-
-    # ==== Codex, computer-use, others ====
     "codex-mini-latest": {
-        "input": 0.15,        # $1.50/1M = 0.15¢/1k
-        "cached_input": 0.0375,
-        "output": 0.6,
+        "input": 0.15,          # $1.50 / 1M tokens
+        "cached_input": 0.0375, # $0.375 / 1M tokens
+        "output": 0.6,          # $6.00 / 1M tokens
     },
-    "computer-use-preview-2025-03-11": {
-        "input": 0.3,         # $3.00/1M = 0.3¢/1k
-        "output": 1.2,
+    "gpt-4o-mini-search-preview": {
+        "input": 0.015,         # $0.15 / 1M tokens
+        "output": 0.06,         # $0.60 / 1M tokens
+    },
+    "gpt-4o-search-preview": {
+        "input": 0.25,          # $2.50 / 1M tokens
+        "output": 1.0,          # $10.00 / 1M tokens
+    },
+    "computer-use-preview": {
+        "input": 0.3,           # $3.00 / 1M tokens
+        "output": 1.2,          # $12.00 / 1M tokens
+    },
+    "gpt-image-1": {
+        "input": 0.5,           # $5.00 / 1M tokens
+        "cached_input": 0.125,  # $1.25 / 1M tokens
     },
 
-    # ==== Embeddings ====
-    "text-embedding-3-small": {
-        "input": 0.002,  # $0.02/1M tokens => 0.002¢/1k.
-    },
-    "text-embedding-3-large": {
-        "input": 0.013,       # $0.13/1M tokens => 0.013¢/1k
-    },
-    "text-embedding-ada-002": {
-        "input": 0.01,        # $0.10/1M tokens => 0.01¢/1k
+    # ==== Image tokens ====
+    "gpt-image-1-image": { # Renamed to avoid conflict with text model
+        "input": 1.0,           # $10.00 / 1M tokens
+        "cached_input": 0.25,   # $2.50 / 1M tokens
+        "output": 4.0,          # $40.00 / 1M tokens
     },
 
-    # ==== Audio and TTS ====
-    "whisper-1": {
-        "minute": 0.006,      # $0.006 per minute audio
+    # ==== Audio tokens ====
+    "gpt-4o-audio-preview-audio": { # Renamed
+        "input": 4.0,           # $40.00 / 1M tokens
+        "output": 8.0,          # $80.00 / 1M tokens
+    },
+    "gpt-4o-mini-audio-preview-audio": { # Renamed
+        "input": 1.0,           # $10.00 / 1M tokens
+        "output": 2.0,          # $20.00 / 1M tokens
+    },
+    "gpt-4o-realtime-preview-audio": { # Renamed
+        "input": 4.0,           # $40.00 / 1M tokens
+        "cached_input": 2.5,    # $2.50 / 1M tokens
+        "output": 8.0,          # $80.00 / 1M tokens
+    },
+    "gpt-4o-mini-realtime-preview-audio": { # Renamed
+        "input": 1.0,           # $10.00 / 1M tokens
+        "cached_input": 0.03,   # $0.30 / 1M tokens
+        "output": 2.0,          # $20.00 / 1M tokens
+    },
+
+    # ==== Fine-tuning ====
+    "o4-mini-2025-04-16": {
+        "training": 100.0,      # $100.00 / hour
+        "input": 0.4,           # $4.00 / 1M tokens
+        "cached_input": 0.1,    # $1.00 / 1M tokens
+        "output": 1.6,          # $16.00 / 1M tokens
+    },
+    "o4-mini-2025-04-16-shared": {
+        "training": 100.0,      # $100.00 / hour
+        "input": 0.2,           # $2.00 / 1M tokens
+        "cached_input": 0.05,   # $0.50 / 1M tokens
+        "output": 0.8,          # $8.00 / 1M tokens
+    },
+    "gpt-4.1-mini-2025-04-14": {
+        "training": 25.0,       # $25.00 / hour
+        "input": 0.3,           # $3.00 / 1M tokens
+        "cached_input": 0.075,  # $0.75 / 1M tokens
+        "output": 1.2,          # $12.00 / 1M tokens
+    },
+    "gpt-4.1-mini-2025-04-14-shared": {
+        "training": 5.0,        # $5.00 / hour
+        "input": 0.08,          # $0.80 / 1M tokens
+        "cached_input": 0.02,   # $0.20 / 1M tokens
+        "output": 0.32,         # $3.20 / 1M tokens
+    },
+    "gpt-4.1-nano-2025-04-14": {
+        "training": 1.5,        # $1.50 / hour
+        "input": 0.02,          # $0.20 / 1M tokens
+        "cached_input": 0.005,  # $0.05 / 1M tokens
+        "output": 0.08,         # $0.80 / 1M tokens
+    },
+    "gpt-4o-2024-08-06": {
+        "training": 25.0,       # $25.00 / hour
+        "input": 0.375,         # $3.75 / 1M tokens
+        "cached_input": 0.1875, # $1.875 / 1M tokens
+        "output": 1.5,          # $15.00 / 1M tokens
+    },
+    "gpt-4o-mini-2024-07-18": {
+        "training": 3.0,        # $3.00 / hour
+        "input": 0.03,          # $0.30 / 1M tokens
+        "cached_input": 0.015,  # $0.15 / 1M tokens
+        "output": 0.12,         # $1.20 / 1M tokens
+    },
+    "gpt-3.5-turbo": {
+        "training": 8.0,        # $8.00 / hour
+        "input": 0.3,           # $3.00 / 1M tokens
+        "output": 0.6,          # $6.00 / 1M tokens
+    },
+    "davinci-002": {
+        "training": 6.0,        # $6.00 / hour
+        "input": 1.2,           # $12.00 / 1M tokens
+        "output": 1.2,          # $12.00 / 1M tokens
+    },
+    "babbage-002": {
+        "training": 0.4,        # $0.40 / hour
+        "input": 0.16,          # $1.60 / 1M tokens
+        "output": 0.16,         # $1.60 / 1M tokens
+    },
+
+    # ==== Transcription and speech generation ====
+    "gpt-4o-mini-tts": {
+        "output": 0.06,         # $0.60 / 1M tokens
+        "minute": 0.0015,       # $0.0015 / minute
     },
     "gpt-4o-transcribe": {
-        "input": 0.25,
-        "output": 1.0,
-        "minute": 0.006,      # $0.006/minute (cost in dollars)
+        "input": 0.25,          # $2.50 / 1M tokens
+        "output": 1.0,          # $10.00 / 1M tokens
+        "minute": 0.0006,       # $0.006 / minute
     },
     "gpt-4o-mini-transcribe": {
-        "input": 0.125,
-        "output": 0.5,
-        "minute": 0.003,      # $0.003/minute (cost in dollars)
+        "input": 0.125,         # $1.25 / 1M tokens
+        "output": 0.5,          # $5.00 / 1M tokens
+        "minute": 0.0003,       # $0.003 / minute
     },
-    "gpt-4o-mini-tts": {
-        # Assuming 1.2 cents per 1k characters ($12.00/1M chars)
-        "output": 1.2,
-        "minute": 0.015,      # $0.015/minute (cost in dollars)
+    "whisper": {
+        "minute": 0.0006,       # $0.006 / minute
+    },
+    "tts": {
+        "character": 0.0000015, # $15.00 / 1M characters
+    },
+    "tts-hd": {
+        "character": 0.000003,  # $30.00 / 1M characters
     },
 
-    # ==== Image ====
-    "gpt-image-1": {
-        "input": 1.0,
-        "output": 4.0,
-    },
-    "dall-e-3": {
-        "standard": 4.0,      # 4.0¢/image
-        "hd": 8.0,            # 8.0¢/image
-    },
-    "dall-e-2": {
-        "standard": 1.6,      # 1.6¢/image (1024x1024)
-        "512": 1.8,           # Assuming 1.8¢/image (512x512)
-        "256": 1.6,           # Assuming 1.6¢/image (256x256)
-    },
+    # ==== Image generation ====
+    "gpt-image-1-low": { "image": 0.011 },
+    "gpt-image-1-medium": { "image": 0.042 },
+    "gpt-image-1-high": { "image": 0.167 },
+    "dall-e-3-standard": { "image": 0.04 },
+    "dall-e-3-hd": { "image": 0.08 },
+    "dall-e-2-standard": { "image": 0.016 },
+
+    # ==== Embeddings ====
+    "text-embedding-3-small": { "input": 0.001 }, # $0.01 / 1M tokens
+    "text-embedding-3-large": { "input": 0.0065 },# $0.065 / 1M tokens
+    "text-embedding-ada-002": { "input": 0.005 }, # $0.05 / 1M tokens
 
     # ==== Moderation ====
-    "omni-moderation-latest": {
-        "input": 0.0,
+    "omni-moderation": { "input": 0.0 },
+
+    # ==== Legacy models ====
+    "chatgpt-4o-latest": {
+        "input": 0.5,           # $5.00 / 1M tokens
+        "output": 1.5,          # $15.00 / 1M tokens
     },
-    "text-moderation-latest": {
-        "input": 0.0,
+    "gpt-4-turbo-2024-04-09": {
+        "input": 1.0,           # $10.00 / 1M tokens
+        "output": 3.0,          # $30.00 / 1M tokens
+    },
+    "gpt-4-0125-preview": {
+        "input": 1.0,           # $10.00 / 1M tokens
+        "output": 3.0,          # $30.00 / 1M tokens
+    },
+    "gpt-4-1106-preview": {
+        "input": 1.0,           # $10.00 / 1M tokens
+        "output": 3.0,          # $30.00 / 1M tokens
+    },
+    "gpt-4-1106-vision-preview": {
+        "input": 1.0,           # $10.00 / 1M tokens
+        "output": 3.0,          # $30.00 / 1M tokens
+    },
+    "gpt-4-0613": {
+        "input": 3.0,           # $30.00 / 1M tokens
+        "output": 6.0,          # $60.00 / 1M tokens
+    },
+    "gpt-4-0314": {
+        "input": 3.0,           # $30.00 / 1M tokens
+        "output": 6.0,          # $60.00 / 1M tokens
+    },
+    "gpt-4-32k": {
+        "input": 6.0,           # $60.00 / 1M tokens
+        "output": 12.0,         # $120.00 / 1M tokens
+    },
+    "gpt-3.5-turbo-0125": {
+        "input": 0.05,          # $0.50 / 1M tokens
+        "output": 0.15,         # $1.50 / 1M tokens
+    },
+    "gpt-3.5-turbo-1106": {
+        "input": 0.1,           # $1.00 / 1M tokens
+        "output": 0.2,          # $2.00 / 1M tokens
+    },
+    "gpt-3.5-turbo-0613": {
+        "input": 0.15,          # $1.50 / 1M tokens
+        "output": 0.2,          # $2.00 / 1M tokens
+    },
+    "gpt-3.5-turbo-0301": {
+        "input": 0.15,          # $1.50 / 1M tokens
+        "output": 0.2,          # $2.00 / 1M tokens
+    },
+    "gpt-3.5-turbo-instruct": {
+        "input": 0.15,          # $1.50 / 1M tokens
+        "output": 0.2,          # $2.00 / 1M tokens
+    },
+    "gpt-3.5-turbo-16k-0613": {
+        "input": 0.3,           # $3.00 / 1M tokens
+        "output": 0.4,          # $4.00 / 1M tokens
     },
 }
 
@@ -299,16 +421,14 @@ def fetch_all_api_keys(project_id: str, api_key: str) -> dict:
 def calculate_costs(usage: dict, model_name: str) -> dict:
     '''
     Calculate the cost based on usage and pricing for a specific model.
-    Assumes PRICING contains token prices in cents per 1k tokens,
-    and minute prices (key 'minute') in dollars per minute.
+    Handles costs for tokens, minutes, characters, and images.
 
     Args:
-        usage (dict): Dictionary containing usage data (e.g., input_tokens, output_tokens, minute).
+        usage (dict): Dictionary containing usage data.
         model_name (str): Name of the model for pricing reference.
 
     Returns:
-        dict: A dictionary with calculated costs for input, output, cached input tokens,
-              and minutes in cents. Returns an empty dict if model_name is not found in PRICING.
+        dict: A dictionary with calculated costs in cents.
     '''
     model_pricing = PRICING.get(model_name)
     if not model_pricing:
@@ -318,18 +438,29 @@ def calculate_costs(usage: dict, model_name: str) -> dict:
         return {}
 
     costs = {}
+    # Token costs (per 1k tokens)
     if 'input_tokens' in usage and 'input' in model_pricing:
-        costs['input_cost'] = (usage['input_tokens'] /
-                               1000.0) * model_pricing['input']
+        costs['input_cost'] = (usage['input_tokens'] / 1000.0) * model_pricing['input']
     if 'output_tokens' in usage and 'output' in model_pricing:
-        costs['output_cost'] = (
-            usage['output_tokens'] / 1000.0) * model_pricing['output']
+        costs['output_cost'] = (usage['output_tokens'] / 1000.0) * model_pricing['output']
     if 'cached_input_tokens' in usage and 'cached_input' in model_pricing:
-        costs['cached_input_cost'] = (
-            usage['cached_input_tokens'] / 1000.0) * model_pricing['cached_input']
+        costs['cached_input_cost'] = (usage['cached_input_tokens'] / 1000.0) * model_pricing['cached_input']
+    
+    # Time-based costs (per minute)
     if 'minute' in usage and 'minute' in model_pricing:
-        costs['minute_cost'] = usage['minute'] * \
-            model_pricing['minute'] * 100.0  # Convert dollars to cents
+        # Cost is in dollars per minute, convert to cents
+        costs['minute_cost'] = usage['minute'] * model_pricing['minute'] * 100.0
+        
+    # Character-based costs
+    if 'characters' in usage and 'character' in model_pricing:
+        # Cost is in dollars per 1M characters, convert to cents
+        costs['character_cost'] = usage['characters'] * model_pricing['character'] * 100.0
+
+    # Image-based costs (per image)
+    if 'num_images' in usage and 'image' in model_pricing:
+        # Cost is in dollars per image, convert to cents
+        costs['image_cost'] = usage['num_images'] * model_pricing['image'] * 100.0
+        
     return costs
 
 
@@ -620,10 +751,11 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
     '''
     table = PrettyTable()
     table.field_names = ["Date", "Project", "Model", "API Key",
-                         "Input (¢)", "Output (¢)", "Cached (¢)", "Total (¢)"]
+                         "Input (¢)", "Output (¢)", "Cached (¢)", "Other (¢)", "Total (¢)"]
     table.align["Input (¢)"] = "r"
     table.align["Output (¢)"] = "r"
     table.align["Cached (¢)"] = "r"
+    table.align["Other (¢)"] = "r"
     table.align["Total (¢)"] = "r"
 
     grand_total_cost = 0.0
@@ -685,7 +817,7 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
             table.add_row([
                 colored(f"{group_label_prefix} {current_primary_group_display_name}",
                         'magenta', attrs=['bold']),
-                "", "", "", "", "", "",  # Span across other columns
+                "", "", "", "", "", "", "", # Span across other columns
                 colored(f"{current_group_total_cost:.4f} ¢",
                         'magenta', attrs=["bold"])
             ])
@@ -707,8 +839,11 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
         output_cost = costs.get('output_cost', 0.0)
         cached_cost = costs.get('cached_input_cost', 0.0)
         minute_cost = costs.get('minute_cost', 0.0)
+        character_cost = costs.get('character_cost', 0.0)
+        image_cost = costs.get('image_cost', 0.0)
 
-        current_row_total = input_cost + output_cost + cached_cost + minute_cost
+        other_costs = minute_cost + character_cost + image_cost
+        current_row_total = input_cost + output_cost + cached_cost + other_costs
         current_group_total_cost += current_row_total
         grand_total_cost += current_row_total
 
@@ -720,6 +855,7 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
             colored(f"{input_cost:.4f}", 'red'),
             colored(f"{output_cost:.4f}", 'red'),
             colored(f"{cached_cost:.4f}", 'red'),
+            colored(f"{other_costs:.4f}", 'red'),
             colored(f"{current_row_total:.4f}", color="red", attrs=["bold"])
         ])
 
@@ -728,7 +864,7 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
         table.add_row([
             colored(f"{group_label_prefix} {current_primary_group_display_name}",
                     'magenta', attrs=['bold']),
-            "", "", "", "", "", "",
+            "", "", "", "", "", "", "",
             colored(f"{current_group_total_cost:.4f} ¢",
                     'magenta', attrs=["bold"])
         ])
@@ -737,7 +873,7 @@ def display_results(all_usage_details: list, project_names: dict, group_by_crite
     # Grand total row
     table.add_row([
         colored("GRAND TOTAL", 'blue', attrs=['bold']),
-        "", "", "", "", "", "",
+        "", "", "", "", "", "", "",
         colored(f"{grand_total_cost:.4f} ¢", 'blue', attrs=["bold"])
     ])
     print(table)

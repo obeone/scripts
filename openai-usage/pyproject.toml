@@ -1,6 +1,6 @@
 [project]
 name = "openai-usage"
-version = "0.2.1"
+version = "0.2.2"
 description = "Console OpenAI API cost and token usage analysis by key and model"
 authors = [
     { name="Grégoire Compagnon (obeone)", email="obeone@obeone.org" },
