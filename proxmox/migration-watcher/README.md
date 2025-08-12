@@ -58,7 +58,7 @@ This tool requires Python 3.7 or higher. It is recommended to install it in an i
 3. Alternatively, install directly from the Git repository URL:
 
     ```bash
-    uv tool install https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher'
+    uv tool install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher'
     ```
 
 ### Classic Method (using venv and pip)
