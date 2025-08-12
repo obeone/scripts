@@ -13,13 +13,15 @@ A command-line tool to inspect token usage and estimated cost for your OpenAI pr
 
 ## Installation
 
-1.  **Install with `pipx`** (recommended) or `pip`:
+1. **Install with `pipx`** (recommended) or `pip`:
+
     ```bash
     pipx install ./openai-usage
     ```
 
-2.  **Set the Environment Variable**:
+2. **Set the Environment Variable**:
     This tool requires an **admin-level** OpenAI API key to access organization and project data. Set it as an environment variable:
+
     ```bash
     export OPENAI_ADMIN_API_KEY="your_admin_api_key_here"
     ```
@@ -29,6 +31,7 @@ A command-line tool to inspect token usage and estimated cost for your OpenAI pr
 ### List Available Projects
 
 To see a list of all projects you have access to:
+
 ```bash
 openai-usage --list-projects
 ```
@@ -36,6 +39,7 @@ openai-usage --list-projects
 ### View Usage for All Projects
 
 To get a complete usage report for all projects, grouped by day:
+
 ```bash
 openai-usage
 ```
@@ -43,6 +47,7 @@ openai-usage
 ### View Usage for Specific Projects and a Date Range
 
 Focus on one or more projects and specify a time window:
+
 ```bash
 openai-usage --projects proj_xxxxxxxxxxxx --start-date 2024-01-01 --end-date 2024-01-31
 ```
@@ -50,9 +55,44 @@ openai-usage --projects proj_xxxxxxxxxxxx --start-date 2024-01-01 --end-date 202
 ### Group and Sort Results
 
 Analyze data by grouping it differently. The following command groups results first by project, then by day:
+
 ```bash
 openai-usage --group-by project day
 ```
+
+## Docker Usage
+
+You can also run this tool using Docker, which isolates the environment and handles dependencies automatically.
+
+1. **Build the Docker Image**:
+    From the root of the project, run the following command to build the image:
+
+    ```bash
+    docker build -t openai-usage .
+    ```
+
+2. **Run the Container**:
+    When running the container, you must pass your `OPENAI_ADMIN_API_KEY` as an environment variable.
+
+    **Example: View Usage for All Projects**
+
+    To get a complete usage report for all projects, grouped by day:
+
+    ```bash
+    openai-usage
+    ```
+
+    **Example: List all projects**
+
+    ```bash
+    docker run --rm -e OPENAI_ADMIN_API_KEY="your_admin_api_key_here" openai-usage --list-projects
+    ```
+
+    **Example: Get usage for specific projects**
+
+    ```bash
+    docker run --rm -e OPENAI_ADMIN_API_KEY="your_admin_api_key_here" openai-usage -p proj_xxxxxxxxxxxx
+    ```
 
 ## Options
 
