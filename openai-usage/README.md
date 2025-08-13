@@ -16,6 +16,8 @@ A command-line tool to inspect token usage and estimated cost for your OpenAI pr
 1. **Install with `pipx`** (recommended) or `pip`:
 
     ```bash
+    git clone https://github.com/obeone/scripts
+    cd scripts
     pipx install ./openai-usage
     ```
 
@@ -79,7 +81,7 @@ You can also run this tool using Docker, which isolates the environment and hand
     To get a complete usage report for all projects, grouped by day:
 
     ```bash
-    openai-usage
+    docker run --rm -e OPENAI_ADMIN_API_KEY="your_admin_api_key_here" openai-usage
     ```
 
     **Example: List all projects**

@@ -13,7 +13,12 @@ A Tkinter based image slideshow with keyboard controls and GIF support.
 ## Installation
 
 ```bash
+git clone https://github.com/obeone/scripts
+cd scripts
 pipx install ./slideshow
+
+# Or
+uv tool install ./slideshow
 ```
 
 ## Running
