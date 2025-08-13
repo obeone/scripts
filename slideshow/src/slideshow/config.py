@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Configuration constants for the Image Slideshow application.
 

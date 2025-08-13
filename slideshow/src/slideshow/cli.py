@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Command-Line Interface for the Image Slideshow application.
 
@@ -19,12 +20,13 @@ from . import config
 # Setup a dedicated logger for this application
 logger = logging.getLogger(__name__)
 
-def main():
+def main() -> None:
     """
-    The main entry point for the application.
-    
-    Parses command-line arguments, sets up the application window and logging,
-    and starts the slideshow.
+    Run the main entry point for the application.
+
+    This function parses command-line arguments, sets up the application
+    window and logging, and starts the slideshow. It handles exceptions
+    and exits with an appropriate status code.
     """
     parser = argparse.ArgumentParser(
         description="A feature-rich image slideshow viewer.",

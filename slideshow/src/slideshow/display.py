@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Image Display and Manipulation Module.
 

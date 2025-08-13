@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 User Input and Event Handling Module.
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Main application class for the Image Slideshow.
 
@@ -15,6 +16,7 @@ from pathlib import Path
 from PIL import Image, ImageTk, ImageSequence
 
 from . import config, controls, display, favorites, hud, image_loader, yoink, exif_utils
+from .exceptions.slideshow_errors import ImageNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +65,14 @@ class ImageSlideshowApp:
 
         self.setup()
 
-    def setup(self):
-        """Initial setup of the application."""
+    def setup(self) -> None:
+        """
+        Perform the initial setup of the application.
+
+        This method loads images from the specified folder, initializes favorites,
+        sets up the main window properties, and binds user controls.
+        If no images are found, it displays an error and closes the application.
+        """
         self.images = image_loader.load_images_from_folder(self.image_folder)
         if not self.images:
             messagebox.showerror("Error", "No valid images found in the specified folder.")
@@ -81,7 +89,19 @@ class ImageSlideshowApp:
         controls.bind_controls(self)
         self.show_image(0)
 
-    def show_image(self, index: int, force_reload: bool = False):
+    def show_image(self, index: int, force_reload: bool = False) -> None:
+        """
+        Display the image at the given index.
+
+        This is the core display function. It handles loading, resizing,
+        and displaying the image on the canvas. It also manages GIF animations,
+        updates the HUD, and preloads subsequent images.
+
+        Args:
+            index: The index of the image to display in the `self.images` list.
+            force_reload: If True, forces the image to be reloaded from disk,
+                          bypassing the cache.
+        """
         if not self.images:
             return
         
@@ -157,42 +177,56 @@ class ImageSlideshowApp:
             if self.info_displayed:
                 self.display_image_info()
 
-        except Exception as e:
+        except (FileNotFoundError, IOError, tk.TclError) as e:
             logger.error(f"Error displaying image '{image_path.name}': {e}", exc_info=True)
             self.next_image_auto()
             return
 
-        self.preloaded_images = image_loader.preload_images(
-            self.images, self.current_index, self.preloaded_images, self.loop
-        )
+        try:
+            self.preloaded_images = image_loader.preload_images(
+                self.images, self.current_index, self.preloaded_images, self.loop
+            )
+        except ImageNotFound as e:
+            logger.warning(f"Failed to preload image, it may have been moved or deleted: {e}")
 
         if self.timer_running and not self._gif_animation_after_id:
             self.after_id = self.window.after(int(self.delay * 1000), self.next_image_auto)
 
-    def next_image_auto(self):
+    def next_image_auto(self) -> None:
+        """
+        Automatically advance to the next image as part of the slideshow timer.
+
+        This method is called by the `after` loop when the slideshow is running.
+        It stops if looping is disabled and the end of the list is reached.
+        """
         if not self.loop and self.current_index >= len(self.images) - 1:
             self.timer_running = False
             hud.update_hud(self)
             return
         self.show_image(self.current_index + 1)
 
-    def next_image(self):
+    def next_image(self) -> None:
+        """Manually advance to the next image, stopping the timer."""
         self.timer_running = False
         self.show_image(self.current_index + 1)
 
-    def previous_image(self):
+    def previous_image(self) -> None:
+        """Manually go to the previous image, stopping the timer."""
         self.timer_running = False
         self.show_image(self.current_index - 1)
 
-    def jump_forward_ten(self):
+    def jump_forward_ten(self) -> None:
+        """Jump 10 images forward, stopping the timer."""
         self.timer_running = False
         self.show_image(self.current_index + 10)
 
-    def jump_backward_ten(self):
+    def jump_backward_ten(self) -> None:
+        """Jump 10 images backward, stopping the timer."""
         self.timer_running = False
         self.show_image(self.current_index - 10)
 
-    def toggle_timer(self):
+    def toggle_timer(self) -> None:
+        """Toggle the automatic slideshow timer on or off."""
         self.timer_running = not self.timer_running
         if self.timer_running:
             self.after_id = self.window.after(int(self.delay * 1000), self.next_image_auto)
@@ -202,7 +236,8 @@ class ImageSlideshowApp:
                 self.after_id = None
         hud.update_hud(self)
 
-    def toggle_auto_stop(self):
+    def toggle_auto_stop(self) -> None:
+        """Toggle the auto-stop feature on or off."""
         self.auto_stop = not self.auto_stop
         if self.auto_stop:
             self.stop_time = time.time() + self.auto_stop_delay
@@ -212,24 +247,34 @@ class ImageSlideshowApp:
             logger.info("Auto-stop disabled.")
         hud.update_hud(self)
 
-    def shuffle_images(self):
+    def shuffle_images(self) -> None:
+        """Shuffle the order of images and display the new current one."""
         self.images, self.current_index = image_loader.shuffle_images(self.images, self.current_index)
         self.show_image(self.current_index)
 
-    def sort_images(self):
-        self.images = image_loader.sort_images_by_time(self.images)
+    def sort_images(self) -> None:
+        """Sort images by modification time and display the first one."""
+        try:
+            self.images = image_loader.sort_images_by_time(self.images)
+        except ImageNotFound as e:
+            logger.error(f"Failed to sort images because a file was not found: {e}")
+            messagebox.showerror("Error", f"Could not sort images.\nFile not found: {e}")
+            return
         self.current_index = 0
         self.show_image(self.current_index)
 
-    def toggle_favorite(self):
+    def toggle_favorite(self) -> None:
+        """Toggle the favorite status of the current image."""
         self.favorites = favorites.toggle_favorite(self.current_index, self.favorites)
         hud.update_hud(self)
 
-    def yoink_image(self):
+    def yoink_image(self) -> None:
+        """Copy the current image to the 'yoink' directory."""
         if self.images:
             yoink.send_to_yoink(self.images[self.current_index], self.canvas)
 
-    def toggle_image_info(self):
+    def toggle_image_info(self) -> None:
+        """Toggle the display of the image information overlay."""
         self.info_displayed = not self.info_displayed
         if self.info_displayed:
             self.display_image_info()
@@ -237,35 +282,55 @@ class ImageSlideshowApp:
             self.clear_image_info()
         hud.update_hud(self)
 
-    def display_image_info(self):
+    def display_image_info(self) -> None:
+        """Display an overlay with information about the current image."""
         self.clear_image_info()
-        if not self.images: return
+        if not self.images:
+            return
         image_path = self.images[self.current_index]
-        
+
         info_text = f"{image_path.name}\n"
         if self._current_photo_ref:
             info_text += f"{self._current_photo_ref.width()}x{self._current_photo_ref.height()} (display)\n"
-        
+
         exif_str = exif_utils.get_formatted_exif_data(image_path)
         if exif_str:
             info_text += f"\n{exif_str}"
 
         self.canvas.create_text(
-            10, 10, text=info_text, fill="white", font=("Helvetica", 10),
-            anchor="nw", tags="info_text"
+            10,
+            10,
+            text=info_text,
+            fill="white",
+            font=("Helvetica", 10),
+            anchor="nw",
+            tags="info_text",
         )
 
-    def clear_image_info(self):
+    def clear_image_info(self) -> None:
+        """Clear the image information overlay from the canvas."""
         self.canvas.delete("info_text")
 
-    def on_resize(self, event: tk.Event):
+    def on_resize(self, event: tk.Event) -> None:
+        """
+        Handle the window resize event.
+
+        To avoid excessive updates during resizing, it schedules the image
+        to be re-rendered after a short delay once resizing has stopped.
+
+        Args:
+            event: The Tkinter event object.
+        """
         if event.widget == self.window:
             if self._resize_job:
                 self.window.after_cancel(self._resize_job)
             if event.width > 50 and event.height > 50:
-                self._resize_job = self.window.after(250, lambda: self.show_image(self.current_index, force_reload=False))
+                self._resize_job = self.window.after(
+                    250, lambda: self.show_image(self.current_index, force_reload=False)
+                )
 
-    def quit(self):
+    def quit(self) -> None:
+        """Cleanly shut down the application."""
         logger.info("Quit command received. Saving favorites and closing.")
         favorites.save_favorites(self.image_folder, self.favorites, len(self.images))
         if self.after_id:
@@ -274,6 +339,6 @@ class ImageSlideshowApp:
             self.window.after_cancel(self._gif_animation_after_id)
         self.window.destroy()
 
-    def run(self):
-        """Starts the Tkinter main loop."""
+    def run(self) -> None:
+        """Start the Tkinter main loop."""
         self.window.mainloop()

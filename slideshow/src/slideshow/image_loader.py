@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Image Loading, Caching, and Management Module.
 
@@ -13,20 +14,20 @@ from typing import List, Dict, Tuple
 from PIL import Image
 
 from .config import SUPPORTED_IMAGE_EXTENSIONS
+from .exceptions.slideshow_errors import ImageNotFound
 
 logger = logging.getLogger(__name__)
 
-def load_images_from_folder(image_folder: Path) -> List[Path]:
+def load_images_from_folder(image_folder: Path) -> list[Path]:
     """
-    Scans a directory recursively for supported image files.
+    Scan a directory recursively for supported image files.
 
     Args:
-        image_folder (Path): The directory to scan.
+        image_folder: The directory path to scan for images.
 
     Returns:
-        List[Path]: A sorted list of Path objects for all valid images found.
-                    Returns an empty list if the folder doesn't exist or no
-                    images are found.
+        A sorted list of Path objects for all valid images found.
+        Returns an empty list if the folder doesn't exist or no images are found.
     """
     if not image_folder.is_dir():
         logger.error(f"The specified image folder '{image_folder}' does not exist or is not a directory.")
@@ -50,17 +51,17 @@ def load_images_from_folder(image_folder: Path) -> List[Path]:
     logger.info(f"Found {len(sorted_images)} images.")
     return sorted_images
 
-def shuffle_images(images: List[Path], current_index: int) -> Tuple[List[Path], int]:
+def shuffle_images(images: list[Path], current_index: int) -> tuple[list[Path], int]:
     """
-    Shuffles the list of images in place, keeping the current image at the start.
+    Shuffle the list of images, keeping the current image at the start.
 
     Args:
-        images (List[Path]): The list of image paths to shuffle.
-        current_index (int): The index of the currently displayed image.
+        images: The list of image paths to shuffle.
+        current_index: The index of the currently displayed image.
 
     Returns:
-        Tuple[List[Path], int]: A tuple containing the shuffled list of images
-                                and the new index of the current image (which is 0).
+        A tuple containing the new shuffled list of images and the new
+        index for the current image (which is always 0).
     """
     if not images:
         return [], 0
@@ -75,16 +76,17 @@ def shuffle_images(images: List[Path], current_index: int) -> Tuple[List[Path], 
     logger.info(f"Shuffled {len(new_images)} images. Current image '{current_image.name}' is now at index 0.")
     return new_images, 0
 
-def sort_images_by_time(images: List[Path], ascending: bool = True) -> List[Path]:
+def sort_images_by_time(images: list[Path], ascending: bool = True) -> list[Path]:
     """
-    Sorts the list of images by their file modification time.
+    Sort the list of images by their file modification time.
 
     Args:
-        images (List[Path]): The list of image paths to sort.
-        ascending (bool): True to sort from oldest to newest, False for newest to oldest.
+        images: The list of image paths to sort.
+        ascending: If True, sorts from oldest to newest. If False, sorts
+                   from newest to oldest.
 
     Returns:
-        List[Path]: The sorted list of image paths.
+        The sorted list of image paths.
     """
     if not images:
         return []
@@ -97,28 +99,31 @@ def sort_images_by_time(images: List[Path], ascending: bool = True) -> List[Path
         return sorted_list
     except FileNotFoundError as e:
         logger.error(f"Error sorting images: file not found during stat call. {e}")
-        # Return the list as is, or an empty list if the error is critical
-        return images
+        raise ImageNotFound(str(e.filename)) from e
 
 def preload_images(
-    images: List[Path], 
-    current_index: int, 
-    cache: Dict[int, Image.Image],
+    images: list[Path],
+    current_index: int,
+    cache: dict[int, Image.Image],
     loop: bool,
-    count: int = 5
-) -> Dict[int, Image.Image]:
+    count: int = 5,
+) -> dict[int, Image.Image]:
     """
-    Preloads subsequent images into a cache for faster display.
+    Preload subsequent images into a cache for faster display.
+
+    This function loads the next `count` images into memory to ensure smooth
+    transitions. It also implements a cache eviction strategy to remove
+    images that are no longer near the current viewing index.
 
     Args:
-        images (List[Path]): The full list of image paths.
-        current_index (int): The index of the currently displayed image.
-        cache (Dict[int, Image.Image]): The dictionary used for caching.
-        loop (bool): Whether the slideshow is in loop mode.
-        count (int): The number of images to preload.
+        images: The full list of image paths.
+        current_index: The index of the currently displayed image.
+        cache: The dictionary used for caching preloaded images.
+        loop: Whether the slideshow is in loop mode.
+        count: The number of subsequent images to preload.
 
     Returns:
-        Dict[int, Image.Image]: The updated cache dictionary.
+        The updated cache dictionary with new images loaded and old ones evicted.
     """
     if not images:
         return {}
@@ -154,10 +159,12 @@ def preload_images(
             
             cache[index_to_load] = image
             logger.debug(f"Preloaded image {index_to_load + 1}/{len(images)}: {image_path.name}")
-        except Exception as e:
+        except (FileNotFoundError, IOError) as e:
             logger.error(f"Error preloading image '{image_path.name}': {e}")
             if index_to_load in cache:
                 del cache[index_to_load]
+            # Re-raise as a domain-specific exception
+            raise ImageNotFound(str(image_path)) from e
 
     # Eviction strategy: remove images far from the current one
     keys_to_keep = set()

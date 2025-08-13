@@ -29,3 +29,29 @@ test = [
     "pytest-mock",
     "pytest-cov",
 ]
+dev = [
+    "ruff",
+    "black",
+    "isort",
+    "mypy",
+    "pre-commit",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py39","py310","py311","py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+extend-select = ["I", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+exclude = ["tests/"]
