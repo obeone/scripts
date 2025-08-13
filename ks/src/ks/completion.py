@@ -22,6 +22,16 @@ _ks_py_completions() {{
     local cur prev words cword split=false
     _get_comp_words_by_ref -n : cur prev words cword
 
+   # Stop trying to complete options after --
+   local i
+   for ((i=1; i<cword; i++)); do
+       if [[ "${{words[i]}}" == "--" ]]; then
+           # Delegate to default file completion
+           _filedir
+           return 0
+       fi
+   done
+
     case "$prev" in
         -C|--context)
             COMPREPLY=($(compgen -W "$({script_name} --_list-contexts)" -- "$cur"))
@@ -57,10 +67,14 @@ _ks_py_completions() {{
             COMPREPLY=($(compgen -W 'debug info warn error' -- "$cur"))
             return 0
             ;;
+        --profile)
+            _filedir
+            return 0
+            ;;
     esac
 
     if [[ "$cur" == -* ]]; then
-        COMPREPLY=($(compgen -W '-C --context -n --namespace -p --pod -c --container -i --image --dry-run -l --log-level -h --help' -- "$cur"))
+        COMPREPLY=($(compgen -W '-C --context -n --namespace -p --pod -c --container -i --image --profile --dry-run -l --log-level -h --help' -- "$cur"))
         return 0
     fi
 }}
@@ -144,6 +158,12 @@ _ks_py_get_containers() {{
 
 _ks_py_completions() {{
     local context state state_descr line=() ret=1
+    
+    # Stop completing options after --
+   if [[ -n "${{words[(I)--]}}" ]]; then
+       return 0
+   fi
+
     local -a log_levels
     log_levels=(
         'debug:Log level for detailed debugging'
@@ -158,6 +178,7 @@ _ks_py_completions() {{
         '(- *)'{{-p,--pod=}}'[Specify pod name]:Pod name:_ks_py_get_pods' \
         '(- *)'{{-c,--container=}}'[Specify container name]:Container name:_ks_py_get_containers' \
         '(- *)'{{-i,--image=}}'[Specify debug image]:Debug container image:_files' \
+        '(- *)'{{--profile=}}'[Specify security profile]:Security profile:_files' \
         '--dry-run[Only print the command without running it]' \
         '(- *)'{{-l,--log-level=}}'[Set log level]:Log level: _values "Log Level" $log_levels' \
         '(-h --help)'{{-h,--help}}'[Show help message]' \
@@ -222,14 +243,15 @@ function __ks_py_get_containers
     end
 end
 
-complete -c {script_name} -n "__fish_use_subcommand" -l context -s C -d "Specify kube context" -a "(__ks_py_get_contexts)"
-complete -c {script_name} -n "__fish_use_subcommand" -l namespace -s n -d "Specify namespace" -a "(__ks_py_get_namespaces)"
-complete -c {script_name} -n "__fish_use_subcommand" -l pod -s p -d "Specify pod name" -a "(__ks_py_get_pods)"
-complete -c {script_name} -n "__fish_use_subcommand" -l container -s c -d "Specify container name" -a "(__ks_py_get_containers)"
-complete -c {script_name} -n "__fish_use_subcommand" -l image -s i -d "Specify debug image" -r -F
-complete -c {script_name} -n "__fish_use_subcommand" -l dry-run -d "Only print the command without running it"
-complete -c {script_name} -n "__fish_use_subcommand" -l log-level -s l -d "Set log level" -a "debug info warn error"
-complete -c {script_name} -n "__fish_use_subcommand" -l help -s h -d "Show help message"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l context -s C -d "Specify kube context" -a "(__ks_py_get_contexts)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l namespace -s n -d "Specify namespace" -a "(__ks_py_get_namespaces)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l pod -s p -d "Specify pod name" -a "(__ks_py_get_pods)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l container -s c -d "Specify container name" -a "(__ks_py_get_containers)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l image -s i -d "Specify debug image" -r -F
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l profile -d "Specify security profile" -r -F
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l dry-run -d "Only print the command without running it"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l log-level -s l -d "Set log level" -a "debug info warn error"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l help -s h -d "Show help message"
 '''
 
 
