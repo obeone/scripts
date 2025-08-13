@@ -106,6 +106,14 @@ ks -n my-namespace -p my-pod --dry-run
 ks --log-level debug
 ```
 
+**Passing commands to the debug container:**
+
+You can pass a command and its arguments to the debug container by appending them after `--`.
+
+```bash
+ks -n my-namespace -p my-pod -- ls -la /
+```
+
 By default, the debug container runs with the `sysadmin` profile, granting extensive privileges. You can override this via the `--profile` option or the `KS_DEBUG_PROFILE` environment variable.
 
 Run `ks --help` for a full list of all available options.
