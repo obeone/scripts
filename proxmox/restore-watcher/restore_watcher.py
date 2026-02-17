@@ -1,4 +1,4 @@
-"""Placeholder CLI for Proxmox restore watcher."""
+"""CLI tool to monitor active Proxmox restore tasks from task logs."""
 
 from __future__ import annotations
 
@@ -243,8 +243,25 @@ def build_tqdm_line(
     average_speed_gib_s: float,
     eta_seconds: float,
     waiting: bool = False,
+    color: bool = False,
 ) -> str:
-    """Build one tqdm-like status line."""
+    """Build one tqdm-like status line.
+
+    Parameters
+    ----------
+    points : Sequence[ProgressPoint]
+        Parsed progress history.
+    speed_gib_s : float
+        Current instantaneous speed in GiB/s.
+    average_speed_gib_s : float
+        Average speed over the full monitoring window in GiB/s.
+    eta_seconds : float
+        Estimated time remaining in seconds.
+    waiting : bool
+        Whether the monitor is idle waiting for new log data.
+    color : bool
+        Whether to apply ANSI color codes to the output.
+    """
     percent = 0.0
     transferred = 0.0
     total = None
@@ -257,7 +274,11 @@ def build_tqdm_line(
 
     bar_width = 28
     filled = int((percent / 100) * bar_width)
-    bar = f"[{'=' * filled}{'.' * (bar_width - filled)}]"
+    bar_inner = f"{'=' * filled}{'.' * (bar_width - filled)}"
+    if color:
+        bar = f"{_COLOR_GREEN}[{bar_inner}]{_COLOR_RESET}"
+    else:
+        bar = f"[{bar_inner}]"
     speed_mib_s = speed_gib_s * 1024
     average_speed_mib_s = average_speed_gib_s * 1024
     eta_text = "n/a" if math.isinf(eta_seconds) else _format_eta(eta_seconds)
@@ -271,10 +292,14 @@ def build_tqdm_line(
     else:
         size_text = f"{transferred:6.2f} %"
 
+    now_speed = f"Now {speed_mib_s:6.1f} {_COLOR_CYAN}MiB/s{_COLOR_RESET}" if color else f"Now {speed_mib_s:6.1f} MiB/s"
+    avg_speed = f"Avg {average_speed_mib_s:6.1f} {_COLOR_CYAN}MiB/s{_COLOR_RESET}" if color else f"Avg {average_speed_mib_s:6.1f} MiB/s"
+    eta_label = f"{_COLOR_YELLOW}ETA{_COLOR_RESET}" if color else "ETA"
+
     return (
         f"{bar} {percent:5.1f}% | {size_text} | "
-        f"Now {speed_mib_s:6.1f} MiB/s | Avg {average_speed_mib_s:6.1f} MiB/s | "
-        f"Elapsed {elapsed_text} | ETA {eta_text}{waiting_text}"
+        f"{now_speed} | {avg_speed} | "
+        f"Elapsed {elapsed_text} | {eta_label} {eta_text}{waiting_text}"
     )
 
 
@@ -294,14 +319,8 @@ def build_dashboard_lines(
         average_speed_gib_s,
         eta_seconds,
         waiting=waiting,
+        color=color,
     )
-    if color:
-        status_line = (
-            status_line.replace("[", f"{_COLOR_GREEN}[")
-            .replace("]", f"]{_COLOR_RESET}")
-            .replace("MiB/s", f"{_COLOR_CYAN}MiB/s{_COLOR_RESET}")
-            .replace("ETA", f"{_COLOR_YELLOW}ETA{_COLOR_RESET}")
-        )
 
     lines = [status_line]
     for log_line in recent_logs[-5:]:
@@ -433,15 +452,38 @@ def resolve_restore_logfile(
     return find_task_logfile(upid, tasks_root=tasks_root)
 
 
-def follow_log_lines(log_path: Path) -> Iterator[str]:
-    """Yield lines from a task logfile as they appear."""
+def follow_log_lines(
+    log_path: Path, idle_timeout_seconds: float = 600.0
+) -> Iterator[str]:
+    """Yield lines from a task logfile as they appear.
+
+    Parameters
+    ----------
+    log_path : Path
+        Path to the task log file to follow.
+    idle_timeout_seconds : float
+        Maximum seconds to wait without new data before stopping.
+        Defaults to 600 (10 minutes).
+
+    Yields
+    ------
+    str
+        Each log line stripped of trailing newline, or empty string
+        when no new data is available yet.
+    """
     with log_path.open(encoding="utf-8") as handle:
+        idle_elapsed = 0.0
+        poll_interval = 0.2
         while True:
             line = handle.readline()
             if line:
+                idle_elapsed = 0.0
                 yield line.rstrip("\n")
                 continue
-            time.sleep(0.2)
+            idle_elapsed += poll_interval
+            if idle_elapsed >= idle_timeout_seconds:
+                return
+            time.sleep(poll_interval)
             yield ""
 
 

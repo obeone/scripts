@@ -8,9 +8,7 @@ version = "0.1.0"
 description = "CLI scaffold to monitor Proxmox restore task progress."
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = [
-    "plotext",
-]
+dependencies = []
 
 [project.optional-dependencies]
 test = [
