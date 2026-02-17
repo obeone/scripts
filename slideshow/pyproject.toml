@@ -1,6 +1,6 @@
 [project]
 name = "slideshow"
-version = "0.3.1"
+version = "0.3.3"
 description = "A feature-rich image slideshow application with Tkinter."
 readme = "README.md"
 requires-python = ">=3.9,<=3.11"
@@ -16,9 +16,8 @@ authors = [
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-packages = ["slideshow"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [project.scripts]
 slideshow = "slideshow.__main__:main"
