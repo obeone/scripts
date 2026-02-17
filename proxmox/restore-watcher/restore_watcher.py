@@ -240,6 +240,7 @@ def build_metrics_line(points: Sequence[ProgressPoint]) -> str:
 def build_tqdm_line(
     points: Sequence[ProgressPoint],
     speed_gib_s: float,
+    average_speed_gib_s: float,
     eta_seconds: float,
     waiting: bool = False,
 ) -> str:
@@ -258,8 +259,12 @@ def build_tqdm_line(
     filled = int((percent / 100) * bar_width)
     bar = f"[{'=' * filled}{'.' * (bar_width - filled)}]"
     speed_mib_s = speed_gib_s * 1024
+    average_speed_mib_s = average_speed_gib_s * 1024
     eta_text = "n/a" if math.isinf(eta_seconds) else _format_eta(eta_seconds)
     waiting_text = " waiting log" if waiting else ""
+    elapsed_text = "00:00:00"
+    if points:
+        elapsed_text = _format_eta(float(max(0, points[-1][0])))
 
     if total and total > 0:
         size_text = f"{transferred:6.2f}/{total:6.2f} GiB"
@@ -267,21 +272,29 @@ def build_tqdm_line(
         size_text = f"{transferred:6.2f} %"
 
     return (
-        f"{bar} {percent:5.1f}% | {size_text} | {speed_mib_s:6.1f} MiB/s | "
-        f"ETA {eta_text}{waiting_text}"
+        f"{bar} {percent:5.1f}% | {size_text} | "
+        f"Now {speed_mib_s:6.1f} MiB/s | Avg {average_speed_mib_s:6.1f} MiB/s | "
+        f"Elapsed {elapsed_text} | ETA {eta_text}{waiting_text}"
     )
 
 
 def build_dashboard_lines(
     points: Sequence[ProgressPoint],
     speed_gib_s: float,
+    average_speed_gib_s: float,
     eta_seconds: float,
     recent_logs: list[str],
     waiting: bool = False,
     color: bool = False,
 ) -> list[str]:
     """Build one status line plus up to five recent log lines."""
-    status_line = build_tqdm_line(points, speed_gib_s, eta_seconds, waiting=waiting)
+    status_line = build_tqdm_line(
+        points,
+        speed_gib_s,
+        average_speed_gib_s,
+        eta_seconds,
+        waiting=waiting,
+    )
     if color:
         status_line = (
             status_line.replace("[", f"{_COLOR_GREEN}[")
@@ -315,6 +328,20 @@ def render_dashboard(
         output_stream.write(f"{line}\n")
     output_stream.flush()
     return len(lines)
+
+
+def calculate_total_average_speed(points: Sequence[ProgressPoint]) -> float:
+    """Calculate average speed from first to latest progress sample."""
+    if len(points) < 2:
+        return 0.0
+
+    start_elapsed, start_value, _ = points[0]
+    end_elapsed, end_value, _ = points[-1]
+    elapsed_delta = end_elapsed - start_elapsed
+    value_delta = end_value - start_value
+    if elapsed_delta <= 0 or value_delta <= 0:
+        return 0.0
+    return value_delta / elapsed_delta
 
 
 def _format_eta(eta_seconds: float) -> str:
@@ -456,6 +483,7 @@ def collect_monitoring_data(
                     lines = build_dashboard_lines(
                         points,
                         last_speed,
+                        calculate_total_average_speed(points),
                         last_eta,
                         list(recent_logs),
                         waiting=False,
@@ -478,6 +506,7 @@ def collect_monitoring_data(
                 lines = build_dashboard_lines(
                     points,
                     last_speed,
+                    calculate_total_average_speed(points),
                     last_eta,
                     list(recent_logs),
                     waiting=True,

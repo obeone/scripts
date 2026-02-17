@@ -67,3 +67,30 @@ def test_calculate_eta_with_memory_keeps_previous_speed_on_stall() -> None:
 
     assert speed == 0.2
     assert eta_seconds == 40.0
+
+
+def test_calculate_total_average_speed_from_first_and_last_points() -> None:
+    """Compute average speed over full elapsed monitoring window."""
+    points = [(10, 2.0, 10.0), (20, 4.0, 10.0), (30, 8.0, 10.0)]
+
+    average_speed = restore_watcher.calculate_total_average_speed(points)
+
+    assert average_speed == 0.3
+
+
+def test_build_tqdm_line_includes_elapsed_avg_and_current_speed() -> None:
+    """Render elapsed time, current throughput, and total average throughput."""
+    points = [(10, 2.0, 10.0), (20, 4.0, 10.0), (30, 8.0, 10.0)]
+
+    line = restore_watcher.build_tqdm_line(
+        points,
+        speed_gib_s=0.4,
+        average_speed_gib_s=0.3,
+        eta_seconds=5.0,
+        waiting=False,
+    )
+
+    assert "Now" in line
+    assert "Avg" in line
+    assert "Elapsed" in line
+    assert "00:00:30" in line

@@ -196,6 +196,7 @@ def test_build_dashboard_lines_keeps_only_five_recent_logs() -> None:
     lines = restore_watcher.build_dashboard_lines(
         points,
         speed_gib_s=0.1,
+        average_speed_gib_s=0.08,
         eta_seconds=80.0,
         recent_logs=logs,
         waiting=False,
