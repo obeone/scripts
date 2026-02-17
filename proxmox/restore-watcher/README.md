@@ -1,16 +1,44 @@
 # Proxmox Restore Watcher
 
-CLI tool to monitor active Proxmox restore tasks from task logs.
+![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## Installation
+A command-line tool to monitor active Proxmox restore tasks (`qmrestore`, `pctrestore`) with a live tqdm-like progress dashboard.
 
-Using `uv` from this directory:
+## 🚀 Features
+
+| Feature | Description |
+| ------- | ----------- |
+| 🔍 Auto-detection | Finds active restore tasks from `/var/log/pve/tasks/active` |
+| 📊 Live dashboard | tqdm-style progress bar with current and average throughput |
+| ⏱️ ETA calculation | Smoothed speed estimation with remaining time display |
+| 📝 Log tail | Shows the 5 most recent log lines below the progress bar |
+| 🎨 Color output | ANSI-colored output when running in a TTY |
+| 🐛 Debug mode | Optional `--debug` flag for verbose diagnostics on stderr |
+
+## 📦 Installation
+
+### Using uv (Recommended)
 
 ```bash
 uv tool install .
 ```
 
-For development and tests:
+(Run from the `proxmox/restore-watcher/` directory)
+
+Or directly from the Git repository:
+
+```bash
+uv tool install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/restore-watcher'
+```
+
+### Using pipx
+
+```bash
+pipx install .
+```
+
+### For development
 
 ```bash
 uv venv
@@ -18,23 +46,46 @@ source .venv/bin/activate
 uv pip install -e .[test]
 ```
 
-## Usage
+## 🔧 Usage
 
 ```bash
 pve-restore-watcher
 ```
 
-The command inspects `/var/log/pve/tasks/active`, filters restore-like tasks,
-follows the selected task log, and prints progress metrics with a final status.
+The tool will:
 
-## Requirements
+1. Read `/var/log/pve/tasks/active` to find running tasks
+2. Filter for restore-like operations (qmrestore, pctrestore, or tasks containing restore keywords)
+3. Resolve and follow the selected task's log file
+4. Display a live progress dashboard until the task completes
+
+Press `Ctrl+C` to stop monitoring.
+
+### Options
+
+| Flag | Description |
+| ---- | ----------- |
+| `--debug` | Enable debug logs on stderr |
+
+## ⚙️ Requirements
 
 - Python 3.8+
-- Access to `/var/log/pve/tasks/`
-- Permission to read task log files on a Proxmox node
+- Access to `/var/log/pve/tasks/` (run on a Proxmox node)
+- Permission to read task log files
 
-## Limitations
+## ⚠️ Limitations
 
-- Progress parsing depends on Proxmox log line formats.
-- Some restore workflows expose only partial progress data.
-- ETA is unavailable when total size is not reported.
+- Progress parsing depends on Proxmox log line formats
+- Some restore workflows expose only partial progress data (percent without total size)
+- ETA is unavailable when total size is not reported
+- If no new log data appears for 10 minutes, monitoring stops automatically
+
+## 🧪 Tests
+
+```bash
+uv run pytest -v
+```
+
+## 📄 License
+
+MIT
