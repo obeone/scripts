@@ -1,0 +1,111 @@
+name: "Build and push openai-usage-report container 🐳"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "openai-usage/**"
+      - ".github/workflows/docker-openai-usage.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "openai-usage/**"
+      - ".github/workflows/docker-openai-usage.yaml"
+
+jobs:
+  # Build only (PRs) - validates Dockerfile without pushing
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./openai-usage
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build and push (main branch only)
+  docker:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        id: dockerhub-login
+        uses: docker/login-action@v3
+        continue-on-error: true
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@v6
+        id: ghcr_build
+        with:
+          context: ./openai-usage
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/obeone/openai-usage-report:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push to Docker Hub
+        if: steps.dockerhub-login.outcome == 'success'
+        uses: docker/build-push-action@v6
+        id: dockerhub_build
+        with:
+          context: ./openai-usage
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: docker.io/obeoneorg/openai-usage-report:latest
+          cache-from: type=gha
+
+      - name: Set up cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign GHCR image
+        env:
+          GHCR_DIGEST: ${{ steps.ghcr_build.outputs.digest }}
+        run: cosign sign --yes "ghcr.io/obeone/openai-usage-report@${GHCR_DIGEST}"
+
+      - name: Sign Docker Hub image
+        if: steps.dockerhub-login.outcome == 'success' && steps.dockerhub_build.outcome == 'success'
+        env:
+          DOCKERHUB_DIGEST: ${{ steps.dockerhub_build.outputs.digest }}
+        run: cosign sign --yes "docker.io/obeoneorg/openai-usage-report@${DOCKERHUB_DIGEST}"
+
+      - name: Update Docker Hub description
+        if: steps.dockerhub-login.outcome == 'success'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: obeoneorg/openai-usage-report
+          readme-filepath: ./openai-usage/README.md
