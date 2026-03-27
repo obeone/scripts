@@ -1,7 +1,7 @@
 # openai-usage 📊
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
-![PyPI](https://img.shields.io/pypi/v/openai-usage?logo=pypi&logoColor=white)
+![PyPI](https://img.shields.io/pypi/v/openai-usage-report?logo=pypi&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -34,13 +34,13 @@ flowchart TB
 ### From PyPI (recommended)
 
 ```bash
-pip install openai-usage
+pip install openai-usage-report
 ```
 
 Or with `uv`:
 
 ```bash
-uv pip install openai-usage
+uv pip install openai-usage-report
 ```
 
 ### From GitHub
