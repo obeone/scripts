@@ -2,15 +2,35 @@
 name = "openai-usage"
 version = "0.3.0"
 description = "Console OpenAI API cost and token usage analysis by key and model"
+readme = "README.md"
+license = "MIT"
 authors = [
     { name="Grégoire Compagnon (obeone)", email="obeone@obeone.org" },
 ]
 requires-python = ">=3.10"
+keywords = ["openai", "api", "usage", "cost", "tokens", "billing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Utilities",
+]
 dependencies = [
     "requests",
     "prettytable",
     "termcolor"
 ]
+
+[project.urls]
+Homepage = "https://github.com/obeone/scripts/tree/main/openai-usage"
+Repository = "https://github.com/obeone/scripts"
+Issues = "https://github.com/obeone/scripts/issues"
 
 [build-system]
 requires = ["setuptools>=61.0"]
