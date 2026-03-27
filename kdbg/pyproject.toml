@@ -12,7 +12,7 @@ readme = "README.md"
 authors = [
     {name = "obeone", email = "obeone@obeone.org"},
 ]
-license = {text = "MIT"}
+license = "MIT"
 
 requires-python = ">=3.8"
 
@@ -29,7 +29,7 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: MIT License",
+
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
