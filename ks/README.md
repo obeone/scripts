@@ -1,119 +1,149 @@
-# ks-debug-helper 🚀
+# ks-debug-helper
 
-A command-line utility to quickly launch a privileged debug container targeting a pod in your Kubernetes cluster.
+![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-debug-326CE5?logo=kubernetes&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-This tool simplifies the process of debugging applications running in Kubernetes by providing an interactive way to select the target pod and container, and then automatically launching a debug session.
+Interactive CLI to launch privileged debug containers against running
+Kubernetes pods. Wraps `kubectl debug` with `fzf`-powered selection
+and automatic Pod Security Admission management.
 
-## Features
-
-- **Interactive Selection**: Uses `fzf` for quick, interactive selection of Kubernetes context, namespace, pod, and container.
-- **Customizable Debug Image**: Specify your preferred debug image using the `--image` option. Defaults to a sensible choice with common networking and troubleshooting tools.
-- **Automatic `kubectl` Command Generation**: Generates and executes the appropriate `kubectl debug` command for you.
-- **Dry-Run Mode**: Use `--dry-run` to print the `kubectl` command without executing it, perfect for learning or scripting.
-- **Colored Logging**: Provides clear, colored log output with adjustable verbosity (`--log-level`).
-- **Security Profile Management**:
-  - Automatically applies the `privileged` Pod Security Admission label to the target namespace if required, and cleans it up on exit.
-  - Allows specifying a security profile with `--profile` (or the `KS_DEBUG_PROFILE` environment variable).
-- **Shell Completion**: Generates completion scripts for Bash, Zsh, and Fish shells for an enhanced user experience.
-
-## Prerequisites
-
-Before using `ks-debug-helper`, you need the following tools installed and available in your system's `PATH`:
-
-- **`kubectl`**: The Kubernetes command-line tool.
-- **`fzf`**: A command-line fuzzy finder, used for interactive menus.
-
-## Installation
-
-It is recommended to install the tool using `pipx` to ensure it is isolated in its own environment.
-
-```bash
-# Clone the repository if you haven't already
-# git clone https://github.com/obeone/scripts
-# cd scripts
-
-# Install using pipx
-pipx install ./ks
-
-# or
-uv tool install ./ks
+```mermaid
+flowchart TB
+    A[ks] --> B{Interactive selection}
+    B --> C[Context]
+    B --> D[Namespace]
+    B --> E[Pod]
+    B --> F[Container]
+    C & D & E & F --> G[Apply privileged PSA label]
+    G --> H[kubectl debug -it]
+    H --> I[Debug session]
+    I --> J[Cleanup PSA label]
 ```
 
-After installation, you may need to set up shell completion.
+## 🚀 Features
 
-### Shell Completion Setup
+| Feature | Description |
+| --- | --- |
+| 🔍 Interactive selection | `fzf`-powered picker for context, namespace, pod, and container |
+| 🐳 Custom debug image | `--image` to use any debug image (default: `obeoneorg/netshoot`) |
+| 🔒 PSA management | Auto-applies `privileged` label, cleans up on exit |
+| 🧪 Dry-run mode | `--dry-run` prints the generated `kubectl` command |
+| 🎨 Colored logging | Adjustable verbosity with `--log-level` |
+| 🐚 Shell completion | Bash, Zsh, and Fish completion scripts |
+| ⚙️ Security profiles | `--profile` or `KS_DEBUG_PROFILE` env var |
 
-To enable command-line completion, add the appropriate line to your shell's configuration file (e.g., `.bashrc`, `.zshrc`, `.config/fish/config.fish`).
+## 📋 Prerequisites
 
-**Bash:**
+- **`kubectl`** — Kubernetes CLI, configured with cluster access
+- **`fzf`** — command-line fuzzy finder
+
+## 📦 Installation
+
+Install directly from the GitHub repository — no need to clone.
+
+### With uv (recommended)
+
+```bash
+uv tool install \
+  'ks-debug-helper @ git+https://github.com/obeone/scripts.git#subdirectory=ks'
+```
+
+### With pipx
+
+```bash
+pipx install \
+  'ks-debug-helper @ git+https://github.com/obeone/scripts.git#subdirectory=ks'
+```
+
+### From a local clone
+
+```bash
+git clone https://github.com/obeone/scripts.git
+uv tool install ./scripts/ks
+```
+
+### Shell completion
+
+Add the appropriate line to your shell configuration file:
+
+**Bash** (`~/.bashrc`):
 
 ```bash
 eval "$(ks --completion bash)"
 ```
 
-**Zsh:**
+**Zsh** (`~/.zshrc`):
 
-```bash
+```zsh
 eval "$(ks --completion zsh)"
 ```
 
-**Fish:**
+**Fish** (`~/.config/fish/config.fish`):
 
-```bash
-
+```fish
 ks --completion fish | source
 ```
 
-## Usage
+## 🛠️ Usage
 
-### Basic Usage
+### Quick start
 
-The simplest way to use the tool is to run it without arguments. It will guide you through selecting the context, namespace, pod, and container.
+Run without arguments for full interactive mode:
 
 ```bash
 ks
 ```
 
-You can also specify the target directly using command-line options:
+### Direct targeting
 
 ```bash
-ks -n my-namespace -p my-app-pod-xxxx -c app-container
+ks -C my-cluster -n my-namespace -p my-pod -c app-container
 ```
 
-### Advanced Examples
+### Common options
 
-**Using a custom debug image:**
+| Option | Description |
+| --- | --- |
+| `-C`, `--context` | Kubernetes context |
+| `-n`, `--namespace` | Target namespace |
+| `-p`, `--pod` | Target pod |
+| `-c`, `--container` | Target container |
+| `-i`, `--image` | Debug image (default: `obeoneorg/netshoot`) |
+| `--profile` | Security profile (default: `sysadmin`) |
+| `--dry-run` | Print command without executing |
+| `-l`, `--log-level` | `debug`, `info`, `warn`, `error` |
+
+### Examples
+
+**Custom debug image:**
 
 ```bash
-ks --image obeoneorg/netshoot
+ks --image busybox:latest
 ```
 
-**Specifying a context and namespace:**
-
-```bash
-ks --context my-cluster-context -n my-special-namespace
-```
-
-**Dry-run to see the generated command:**
+**Dry-run to inspect the command:**
 
 ```bash
 ks -n my-namespace -p my-pod --dry-run
 ```
 
-**Setting the log level for more detailed output:**
+**Run a command in the debug container:**
+
+```bash
+ks -n my-namespace -p my-pod -- tcpdump -i eth0
+```
+
+**Verbose output:**
 
 ```bash
 ks --log-level debug
 ```
 
-**Passing commands to the debug container:**
+---
 
-You can pass a command and its arguments to the debug container by appending them after `--`.
+## 📄 License
 
-```bash
-ks -n my-namespace -p my-pod -- ls -la /
-```
+MIT — see [LICENSE](../LICENSE) for details.
 
-By default, the debug container runs with the `sysadmin` profile, granting extensive privileges. You can override this via the `--profile` option or the `KS_DEBUG_PROFILE` environment variable.
-
-Run `ks --help` for a full list of all available options.
+**Author:** [obeone](https://github.com/obeone)
