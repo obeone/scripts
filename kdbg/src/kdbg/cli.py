@@ -55,7 +55,7 @@ def main() -> None:
         description="Launch a privileged debug container in a Kubernetes cluster.",
         epilog="""
             This tool uses fzf for interactive selection if kubectl and fzf are available.
-            Example: ks -n my-namespace -p my-pod
+            Example: kdbg -n my-namespace -p my-pod
         """
     )
     parser.add_argument(
@@ -81,7 +81,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--profile",
-        default=os.environ.get("KS_DEBUG_PROFILE", "sysadmin"),
+        default=os.environ.get("KDBG_PROFILE", "sysadmin"),
         help="Specify the security profile for the debug container."
     )
     parser.add_argument(
@@ -106,11 +106,11 @@ def main() -> None:
     parser.add_argument("--_list-pods", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--_list-containers", action="store_true", help=argparse.SUPPRESS)
     # Capture all remaining arguments as the command to be executed in the debug container.
-    # The '--' is used to clearly separate ks arguments from the command arguments.
+    # The '--' is used to clearly separate kdbg arguments from the command arguments.
     parser.add_argument(
         "command_args",
         nargs=argparse.REMAINDER,
-        help="Command and arguments for the debug container. Use '--' to separate them from ks options.",
+        help="Command and arguments for the debug container. Use '--' to separate them from kdbg options.",
     )
 
     args = parser.parse_args()

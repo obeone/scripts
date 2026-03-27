@@ -3,17 +3,16 @@
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-# backend-path is deprecated.
 
 [project]
-name = "ks-debug-helper"
-version = "0.3.2"
-description = "A helper script to launch a debug container targeting a specific application container within a Kubernetes pod."
+name = "kdbg"
+version = "0.4.0"
+description = "Interactive CLI to launch privileged debug containers against running Kubernetes pods."
 readme = "README.md"
 authors = [
     {name = "obeone", email = "obeone@obeone.org"},
 ]
-license = {text = "MIT"}
+license = "MIT"
 
 requires-python = ">=3.8"
 
@@ -30,7 +29,7 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: MIT License",
+
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -45,19 +44,14 @@ classifiers = [
 
 keywords = ["kubernetes", "k8s", "debug", "cli", "troubleshooting", "devops", "helper"]
 
-# This section is crucial for `pip install` to create an executable script
-# that `pipx` can also use.
 [project.scripts]
-# 'ks' will be the command name available in the PATH after installation.
-# This assumes your script file is named ks.py and contains a main() function.
-ks = "ks.cli:main"
+kdbg = "kdbg.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["ks"]
+packages = ["kdbg"]
 
-# Optional: Project URLs (e.g., if you host it on GitHub)
-# [project.urls]
-# "Homepage" = "https://github.com/obeone/ks-debug-helper"
-# "Bug Tracker" = "https://github.com/obeone/ks-debug-helper/issues"
-# "Repository" = "https://github.com/obeone/ks-debug-helper.git"
+[project.urls]
+"Homepage" = "https://github.com/obeone/scripts/tree/main/kdbg"
+"Bug Tracker" = "https://github.com/obeone/scripts/issues"
+"Repository" = "https://github.com/obeone/scripts"

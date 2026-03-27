@@ -1,8 +1,9 @@
-# ks-debug-helper
+# kdbg
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-debug-326CE5?logo=kubernetes&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![PyPI](https://img.shields.io/pypi/v/kdbg?logo=pypi&logoColor=white)
 
 Interactive CLI to launch privileged debug containers against running
 Kubernetes pods. Wraps `kubectl debug` with `fzf`-powered selection
@@ -10,7 +11,7 @@ and automatic Pod Security Admission management.
 
 ```mermaid
 flowchart TB
-    A[ks] --> B{Interactive selection}
+    A[kdbg] --> B{Interactive selection}
     B --> C[Context]
     B --> D[Namespace]
     B --> E[Pod]
@@ -31,7 +32,7 @@ flowchart TB
 | 🧪 Dry-run mode | `--dry-run` prints the generated `kubectl` command |
 | 🎨 Colored logging | Adjustable verbosity with `--log-level` |
 | 🐚 Shell completion | Bash, Zsh, and Fish completion scripts |
-| ⚙️ Security profiles | `--profile` or `KS_DEBUG_PROFILE` env var |
+| ⚙️ Security profiles | `--profile` or `KDBG_PROFILE` env var |
 
 ## 📋 Prerequisites
 
@@ -40,27 +41,30 @@ flowchart TB
 
 ## 📦 Installation
 
-Install directly from the GitHub repository — no need to clone.
+### From PyPI (recommended)
 
-### With uv (recommended)
+```bash
+uv tool install kdbg
+```
+
+or with pipx:
+
+```bash
+pipx install kdbg
+```
+
+### From GitHub
 
 ```bash
 uv tool install \
-  'ks-debug-helper @ git+https://github.com/obeone/scripts.git#subdirectory=ks'
-```
-
-### With pipx
-
-```bash
-pipx install \
-  'ks-debug-helper @ git+https://github.com/obeone/scripts.git#subdirectory=ks'
+  'kdbg @ git+https://github.com/obeone/scripts.git#subdirectory=kdbg'
 ```
 
 ### From a local clone
 
 ```bash
 git clone https://github.com/obeone/scripts.git
-uv tool install ./scripts/ks
+uv tool install ./scripts/kdbg
 ```
 
 ### Shell completion
@@ -70,19 +74,19 @@ Add the appropriate line to your shell configuration file:
 **Bash** (`~/.bashrc`):
 
 ```bash
-eval "$(ks --completion bash)"
+eval "$(kdbg --completion bash)"
 ```
 
 **Zsh** (`~/.zshrc`):
 
 ```zsh
-eval "$(ks --completion zsh)"
+eval "$(kdbg --completion zsh)"
 ```
 
 **Fish** (`~/.config/fish/config.fish`):
 
 ```fish
-ks --completion fish | source
+kdbg --completion fish | source
 ```
 
 ## 🛠️ Usage
@@ -92,13 +96,13 @@ ks --completion fish | source
 Run without arguments for full interactive mode:
 
 ```bash
-ks
+kdbg
 ```
 
 ### Direct targeting
 
 ```bash
-ks -C my-cluster -n my-namespace -p my-pod -c app-container
+kdbg -C my-cluster -n my-namespace -p my-pod -c app-container
 ```
 
 ### Common options
@@ -119,25 +123,25 @@ ks -C my-cluster -n my-namespace -p my-pod -c app-container
 **Custom debug image:**
 
 ```bash
-ks --image busybox:latest
+kdbg --image busybox:latest
 ```
 
 **Dry-run to inspect the command:**
 
 ```bash
-ks -n my-namespace -p my-pod --dry-run
+kdbg -n my-namespace -p my-pod --dry-run
 ```
 
 **Run a command in the debug container:**
 
 ```bash
-ks -n my-namespace -p my-pod -- tcpdump -i eth0
+kdbg -n my-namespace -p my-pod -- tcpdump -i eth0
 ```
 
 **Verbose output:**
 
 ```bash
-ks --log-level debug
+kdbg --log-level debug
 ```
 
 ---

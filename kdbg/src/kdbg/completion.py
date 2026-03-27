@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 BASH_COMPLETION_TEMPLATE = '''\
 #!/usr/bin/env bash
 # Bash completion script for {script_name}
-_ks_py_completions() {{
+_kdbg_completions() {{
     local cur prev words cword split=false
     _get_comp_words_by_ref -n : cur prev words cword
 
@@ -124,22 +124,22 @@ _get_kpod_from_cmdline() {{
     echo ""
 }}
 
-complete -F _ks_py_completions {script_name}
+complete -F _kdbg_completions {script_name}
 '''
 
 ZSH_COMPLETION_TEMPLATE = r'''#compdef {script_name}
 # Zsh completion script for {script_name}
 
-_ks_py_get_contexts() {{
+_kdbg_get_contexts() {{
     compadd $( {script_name} --_list-contexts )
 }}
 
-_ks_py_get_namespaces() {{
+_kdbg_get_namespaces() {{
     local kcontext_arg=$(echo $words | sed -n -E 's/.* (--context|-C) ([^ ]*).*/\1 \2/p')
     compadd $( {script_name} $kcontext_arg --_list-namespaces )
 }}
 
-_ks_py_get_pods() {{
+_kdbg_get_pods() {{
     local kcontext_arg=$(echo $words | sed -n -E 's/.* (--context|-C) ([^ ]*).*/\1 \2/p')
     local knamespace_val=$(echo $words | sed -n -E 's/.* (--namespace|-n) ([^ ]*).*/\2/p')
     if [[ -n "$knamespace_val" ]]; then
@@ -147,7 +147,7 @@ _ks_py_get_pods() {{
     fi
 }}
 
-_ks_py_get_containers() {{
+_kdbg_get_containers() {{
     local kcontext_arg=$(echo $words | sed -n -E 's/.* (--context|-C) ([^ ]*).*/\1 \2/p')
     local knamespace_val=$(echo $words | sed -n -E 's/.* (--namespace|-n) ([^ ]*).*/\2/p')
     local kpod_val=$(echo $words | sed -n -E 's/.* (--pod|-p) ([^ ]*).*/\2/p')
@@ -156,7 +156,7 @@ _ks_py_get_containers() {{
     fi
 }}
 
-_ks_py_completions() {{
+_kdbg_completions() {{
     local context state state_descr line=() ret=1
     
     # Stop completing options after --
@@ -173,10 +173,10 @@ _ks_py_completions() {{
     )
 
     _arguments -C -s -S \
-        '(- *)'{{-C,--context=}}'[Specify kube context]:Kubernetes context:_ks_py_get_contexts' \
-        '(- *)'{{-n,--namespace=}}'[Specify namespace]:Kubernetes namespace:_ks_py_get_namespaces' \
-        '(- *)'{{-p,--pod=}}'[Specify pod name]:Pod name:_ks_py_get_pods' \
-        '(- *)'{{-c,--container=}}'[Specify container name]:Container name:_ks_py_get_containers' \
+        '(- *)'{{-C,--context=}}'[Specify kube context]:Kubernetes context:_kdbg_get_contexts' \
+        '(- *)'{{-n,--namespace=}}'[Specify namespace]:Kubernetes namespace:_kdbg_get_namespaces' \
+        '(- *)'{{-p,--pod=}}'[Specify pod name]:Pod name:_kdbg_get_pods' \
+        '(- *)'{{-c,--container=}}'[Specify container name]:Container name:_kdbg_get_containers' \
         '(- *)'{{-i,--image=}}'[Specify debug image]:Debug container image:_files' \
         '(- *)'{{--profile=}}'[Specify security profile]:Security profile:_files' \
         '--dry-run[Only print the command without running it]' \
@@ -187,17 +187,17 @@ _ks_py_completions() {{
     return $ret
 }}
 
-_ks_py_completions "$@"
+_kdbg_completions "$@"
 '''
 
 FISH_COMPLETION_TEMPLATE = '''\
 # Fish completion script for {script_name}
 
-function __ks_py_get_contexts
+function __kdbg_get_contexts
     {script_name} --_list-contexts
 end
 
-function __ks_py_get_namespaces
+function __kdbg_get_namespaces
     set -l kcontext_arg (commandline -opc | string match -r -- '(--context=|-C)([^ ]+)' | string replace -r -- '(--context=|-C)' '')
     set -l context_option
     if test -n "$kcontext_arg"
@@ -206,7 +206,7 @@ function __ks_py_get_namespaces
     {script_name} $context_option --_list-namespaces
 end
 
-function __ks_py_get_pods
+function __kdbg_get_pods
     set -l kcontext_arg (commandline -opc | string match -r -- '(--context=|-C)([^ ]+)' | string replace -r -- '(--context=|-C)' '')
     set -l knamespace_arg (commandline -opc | string match -r -- '(--namespace=|-n)([^ ]+)' | string replace -r -- '(--namespace=|-n)' '')
     set -l context_option
@@ -222,7 +222,7 @@ function __ks_py_get_pods
     end
 end
 
-function __ks_py_get_containers
+function __kdbg_get_containers
     set -l kcontext_arg (commandline -opc | string match -r -- '(--context=|-C)([^ ]+)' | string replace -r -- '(--context=|-C)' '')
     set -l knamespace_arg (commandline -opc | string match -r -- '(--namespace=|-n)([^ ]+)' | string replace -r -- '(--namespace=|-n)' '')
     set -l kpod_arg (commandline -opc | string match -r -- '(--pod=|-p)([^ ]+)' | string replace -r -- '(--pod=|-p)' '')
@@ -243,10 +243,10 @@ function __ks_py_get_containers
     end
 end
 
-complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l context -s C -d "Specify kube context" -a "(__ks_py_get_contexts)"
-complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l namespace -s n -d "Specify namespace" -a "(__ks_py_get_namespaces)"
-complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l pod -s p -d "Specify pod name" -a "(__ks_py_get_pods)"
-complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l container -s c -d "Specify container name" -a "(__ks_py_get_containers)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l context -s C -d "Specify kube context" -a "(__kdbg_get_contexts)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l namespace -s n -d "Specify namespace" -a "(__kdbg_get_namespaces)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l pod -s p -d "Specify pod name" -a "(__kdbg_get_pods)"
+complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l container -s c -d "Specify container name" -a "(__kdbg_get_containers)"
 complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l image -s i -d "Specify debug image" -r -F
 complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l profile -d "Specify security profile" -r -F
 complete -c {script_name} -n "not __fish_seen_subcommand_from --" -l dry-run -d "Only print the command without running it"
