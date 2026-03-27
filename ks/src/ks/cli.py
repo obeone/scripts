@@ -211,7 +211,11 @@ def main() -> None:
         logger.info("Namespace '%s' already has the 'privileged' label.", selected_namespace)
 
     # Construct and execute the kubectl debug command
-    debug_pod_name = f"debug-{selected_pod}-{uuid.uuid4().hex[:6]}"
+    # Container names must not exceed 63 characters (Kubernetes DNS label limit).
+    # Format: "debug-<pod>-<hex>" with prefix (6) + separator (1) + suffix (6) = 13 chars overhead.
+    max_pod_len = 63 - len("debug-") - len("-") - 6  # 50 chars for pod name
+    truncated_pod = selected_pod[:max_pod_len].rstrip("-")
+    debug_pod_name = f"debug-{truncated_pod}-{uuid.uuid4().hex[:6]}"
     
     kubectl_command = ["kubectl", "debug", "-it"]
     if selected_context:
