@@ -1,4 +1,4 @@
-# openai-usage 📊
+# openai-usage-report 📊
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![PyPI](https://img.shields.io/pypi/v/openai-usage-report?logo=pypi&logoColor=white)
@@ -7,13 +7,27 @@
 
 A command-line tool to inspect token usage and estimated cost for your OpenAI projects.
 
-```mermaid
-flowchart TB
-    A[OPENAI_ADMIN_API_KEY] --> B[Fetch Projects & Usage]
-    C[litellm Pricing DB] --> D[Local Cache]
-    B --> E[Calculate Costs]
-    D --> E
-    E --> F[Color-coded Terminal Table]
+```text
+┌─────────────────────┐     ┌──────────────────┐
+│ OPENAI_ADMIN_API_KEY │     │ litellm Pricing  │
+└─────────┬───────────┘     └────────┬─────────┘
+          │                          │
+          ▼                          ▼
+┌─────────────────────┐     ┌──────────────────┐
+│ Fetch Projects &    │     │   Local Cache    │
+│ Usage Data          │     │  (~/.cache/...)  │
+└─────────┬───────────┘     └────────┬─────────┘
+          │                          │
+          └──────────┬───────────────┘
+                     ▼
+          ┌──────────────────────┐
+          │   Calculate Costs    │
+          └──────────┬───────────┘
+                     ▼
+          ┌──────────────────────┐
+          │ Color-coded Terminal │
+          │       Table          │
+          └──────────────────────┘
 ```
 
 ## 🚀 Features
@@ -34,25 +48,29 @@ flowchart TB
 ### From PyPI (recommended)
 
 ```bash
-pip install openai-usage-report
-```
+# With uv (recommended)
+uv tool install openai-usage-report
 
-Or with `uv`:
-
-```bash
-uv pip install openai-usage-report
+# With pipx
+pipx install openai-usage-report
 ```
 
 ### From GitHub
 
 ```bash
 # With uv
-uv pip install git+https://github.com/obeone/scripts#subdirectory=openai-usage
+uv tool install git+https://github.com/obeone/scripts#subdirectory=openai-usage
 
 # With pipx
 git clone https://github.com/obeone/scripts
 cd scripts
 pipx install ./openai-usage
+```
+
+### Docker
+
+```bash
+docker run --rm -e OPENAI_ADMIN_API_KEY="..." obeoneorg/openai-usage-report
 ```
 
 ### Environment Variable
@@ -113,10 +131,15 @@ A warning is displayed if the cache is older than 30 days.
 
 | Command | Description |
 |---|---|
-| `docker build -t openai-usage .` | Build the image |
-| `docker run --rm -e OPENAI_ADMIN_API_KEY="..." openai-usage` | View all projects usage |
-| `docker run --rm -e OPENAI_ADMIN_API_KEY="..." openai-usage -l` | List projects |
-| `docker run --rm -e OPENAI_ADMIN_API_KEY="..." openai-usage -p proj_xxx` | Specific project |
+| `docker run --rm -e OPENAI_ADMIN_API_KEY="..." obeoneorg/openai-usage-report` | View all projects usage |
+| `docker run --rm -e OPENAI_ADMIN_API_KEY="..." obeoneorg/openai-usage-report -l` | List projects |
+| `docker run --rm -e OPENAI_ADMIN_API_KEY="..." obeoneorg/openai-usage-report -p proj_xxx` | Specific project |
+
+Build locally:
+
+```bash
+docker build -t openai-usage-report ./openai-usage
+```
 
 ---
 
