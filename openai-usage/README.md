@@ -6,16 +6,20 @@ A command-line tool to inspect token usage and estimated cost for your OpenAI pr
 
 - **List Projects**: See all projects accessible with your admin API key.
 - **Detailed Usage**: Fetch usage data broken down by day, model, and API key.
-- **Cost Calculation**: Automatically calculate estimated costs using a comprehensive, up-to-date pricing table.
+- **Auto-Updated Pricing**: Pricing data is automatically fetched from [litellm](https://github.com/BerriAI/litellm)'s community-maintained database and cached locally. Update anytime with `--update-pricing`.
 - **Flexible Grouping**: Group and sort results by day, project, key, or model to analyze data from different perspectives.
 - **Custom Date Ranges**: Specify start and end dates to focus on a particular period.
 - **Colorful Output**: Presents data in a clear, color-coded table for easy reading.
 
 ## Installation
 
-1. **Install with `pipx`** (recommended) or `pip`:
+1. **Install with `uv`** (recommended), `pipx`, or `pip`:
 
     ```bash
+    # With uv (recommended)
+    uv pip install git+https://github.com/obeone/scripts#subdirectory=openai-usage
+
+    # With pipx
     git clone https://github.com/obeone/scripts
     cd scripts
     pipx install ./openai-usage
@@ -62,6 +66,22 @@ Analyze data by grouping it differently. The following command groups results fi
 openai-usage --group-by project day
 ```
 
+### Manage Pricing Data
+
+Pricing is automatically fetched from litellm on first run and cached locally (`~/.cache/openai-usage/pricing.json`). To update it manually:
+
+```bash
+openai-usage --update-pricing
+```
+
+To check the cache status:
+
+```bash
+openai-usage --pricing-info
+```
+
+A warning is displayed if the cache is older than 30 days.
+
 ## Docker Usage
 
 You can also run this tool using Docker, which isolates the environment and handles dependencies automatically.
@@ -106,5 +126,7 @@ You can also run this tool using Docker, which isolates the environment and hand
 | `--start-date YYYY-MM-DD` | `-sd` | The start date for the usage report. | Start of current month |
 | `--end-date YYYY-MM-DD` | `-ed` | The end date for the usage report. | End of current month |
 | `--group-by [CRITERIA ...]` | `-gb` | Criteria to group and sort results. Order matters. | `day` |
+| `--update-pricing` | | Fetch latest pricing from litellm and update local cache. | |
+| `--pricing-info` | | Show pricing cache path, last update date, and model count. | |
 
 **Available Grouping Criteria**: `day`, `project`, `key`, `model`.
