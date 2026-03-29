@@ -1,164 +1,175 @@
-# 🚀 transfer.sh
+![Bash](https://img.shields.io/badge/Bash-5.x-4EAA25?logo=gnubash&logoColor=white)
+![transfer.sh](https://img.shields.io/badge/transfer.sh-compatible-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-A powerful and feature-rich command-line tool to interact with the [Transfer.sh](https://transfer.sh) service for seamless file sharing.
+# transfer.sh CLI
 
-## 📜 Description
+Bash CLI for uploading, downloading, deleting and inspecting files on any [transfer.sh](https://transfer.sh) instance, with client-side AES-256-CBC encryption, auto-zip, and progress bars.
 
-This script provides a convenient and robust way to **upload**, **download**, **delete**, and get **information** about files hosted on any Transfer.sh instance. It's designed for ease of use and flexibility, supporting advanced features like client-side encryption, download limits, and file expiration.
+---
 
-## ✨ Features
+```mermaid
+flowchart TB
+    A[File / Directory] --> B{Encrypt?}
+    B -- yes --> C[AES-256-CBC]
+    B -- no --> D{Zip?}
+    C --> D
+    D -- yes --> E[zip archive]
+    D -- no --> F[Upload via curl]
+    E --> F
+    F --> G[Share URL + Delete URL]
 
-- 📤 **Send** files and directories with ease.
-- 📥 **Receive** files directly to your machine.
-- 🗑️ **Delete** files from the server when they are no longer needed.
-- ℹ️ Get **information** about a shared file (size, expiration, etc.).
-- 🔒 Client-side **encryption/decryption** (AES-256-CBC) for maximum privacy.
-- 📦 Automatic **zipping** of multiple files or directories before upload.
-- ⚙️ Set **maximum downloads** and **expiration days** for your shares.
-- 📊 **Progress bars** for uploads and downloads powered by `pv`.
-- 🌐 Support for **custom Transfer.sh instances**.
-- 🔐 **Basic Authentication** support for private instances.
-- 🎨 Colorful and informative logging.
+    H[URL] --> I[Download via curl]
+    I --> J{Decrypt?}
+    J -- yes --> K[AES-256-CBC decrypt]
+    J -- no --> L{Unzip?}
+    K --> L
+    L -- yes --> M[Extract archive]
+    L -- no --> N[Done]
+    M --> N
+```
 
-## ✅ Requirements
+---
 
-Make sure you have these tools installed on your system:
+## Features
 
-- `curl`
-- `openssl`
-- `zip`
-- `pv`
+| | Feature | Detail |
+|---|---|---|
+| 📤 | **Send** | Upload files or directories; directories and multiple files are auto-zipped |
+| 📥 | **Receive** | Download with optional decryption and auto-unzip prompt |
+| 🗑️ | **Delete** | Remove a file using its delete URL |
+| ℹ️ | **Info** | Retrieve file metadata (size, expiration, …) |
+| 🔒 | **Encryption** | Client-side AES-256-CBC — server never sees plaintext |
+| 📦 | **Auto-zip** | Multiple files or a directory → zipped transparently |
+| ⏱️ | **Limits** | Per-upload max downloads and expiration days |
+| 📊 | **Progress** | Upload/download progress bars via `pv` |
+| 🌐 | **Custom instance** | Point to any transfer.sh-compatible server |
+| 🔐 | **Basic auth** | Username/password for private instances |
 
-## 🛠️ Installation
+**Prerequisites:** `curl`, `openssl`, `zip`, `pv`
 
-1. **Clone the repository or download the script:**
+---
 
-    ```bash
-    # Using git
-    git clone https://github.com/obeone/scripts.git
-    cd scripts/transfer.sh
+## Installation
 
-    # Or just download the script
-    curl -o transfer.sh https://raw.githubusercontent.com/obeone/scripts/main/transfer.sh/transfer.sh
-    ```
+```bash
+# Clone and make executable
+git clone https://github.com/obeone/scripts.git
+chmod +x scripts/transfer.sh/transfer.sh
 
-2. **Make the script executable:**
+# Or download the script directly
+curl -o transfer.sh https://raw.githubusercontent.com/obeone/scripts/main/transfer.sh/transfer.sh
+chmod +x transfer.sh
 
-    ```bash
-    chmod +x transfer.sh
-    ```
+# (Optional) install system-wide
+sudo mv transfer.sh /usr/local/bin/
+```
 
-3. **(Optional) Move it to your PATH:**
-    For easy access from anywhere, move the script to a directory in your system's `PATH`.
-
-    ```bash
-    sudo mv transfer.sh /usr/local/bin/
-    ```
+---
 
 ## Usage
-
-The script is command-based, similar to `git` or `docker`.
 
 ```bash
 ./transfer.sh [GLOBAL OPTIONS] <command> [COMMAND OPTIONS]
 ```
 
-### 🌍 Global Options
+**Global options**
 
-- `--log-level <level>`: Set the logging level (`ERROR`, `WARN`, `INFO`, `DEBUG`). Default: `INFO`.
-- `--tmp-dir <directory>`: Set a custom temporary directory for intermediate files.
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--log-level <level>` | `ERROR` / `WARN` / `INFO` / `DEBUG` | `INFO` |
+| `--tmp-dir <dir>` | Custom temporary directory | system `TMPDIR` |
 
 ---
 
 ### Commands
 
-#### 📤 `send`
+| Command | Description |
+|---------|-------------|
+| `send` | Upload one or more files / directories |
+| `receive` | Download a file from a URL |
+| `delete` | Delete a file using its delete URL |
+| `info` | Show metadata for a shared file |
 
-Uploads one or more files or directories. If you provide multiple items or a single directory, they will be automatically zipped.
+---
+
+### `send`
 
 ```bash
 ./transfer.sh send [OPTIONS] <file|directory>...
 ```
 
-**Options:**
-
-- `-d, --max-downloads <value>`: Set the maximum number of downloads.
-- `-D, --max-days <value>`: Set the maximum number of days the file is stored.
-- `-k, --key <value>`: Encryption key for your file.
-- `-u, --user <value>`: Username for basic authentication.
-- `-p, --password <value>`: Password for basic authentication.
-- `-y`: Bypass the confirmation prompt for a faster workflow.
-- `-h, --help`: Display the help message for the `send` command.
-
-**Examples:**
+| Option | Description |
+|--------|-------------|
+| `-d, --max-downloads <n>` | Maximum number of downloads |
+| `-D, --max-days <n>` | Maximum days before expiration |
+| `-k, --key <secret>` | Encrypt with AES-256-CBC using this key |
+| `-u, --user <user>` | Basic auth username |
+| `-p, --password <pass>` | Basic auth password |
+| `-y` | Skip confirmation prompt |
 
 ```bash
 # Upload a single file
 ./transfer.sh send ./myfile.txt
 
-# Upload and encrypt a file with a secret key
+# Encrypt before upload
 ./transfer.sh send --key "mySuperSecretKey123" ./my-document.pdf
 
-# Upload and zip a folder and another file
+# Auto-zip a folder + a file
 ./transfer.sh send ./my_project_folder/ ./notes.txt
 
-# Upload a file with a 5-download limit, expiring in 3 days
+# 5-download limit, expires in 3 days
 ./transfer.sh send -d 5 -D 3 ./release.zip
 ```
 
-#### 📥 `receive`
+---
 
-Downloads a file from a Transfer.sh URL.
+### `receive`
 
 ```bash
 ./transfer.sh receive [OPTIONS] <URL> [destination]
 ```
 
-**Options:**
-
-- `-k, --key <value>`: Decryption key if the file is encrypted.
-- `-u, --unzip`: Offer to unzip the file after download if it's a `.zip` or `.tar.gz` archive.
-- `-h, --help`: Display the help message for the `receive` command.
-
-**Examples:**
+| Option | Description |
+|--------|-------------|
+| `-k, --key <secret>` | Decryption key for an encrypted file |
+| `-u, --unzip` | Prompt to extract archive after download |
 
 ```bash
-# Download a file to the current directory
+# Download to current directory
 ./transfer.sh receive https://transfer.obeone.cloud/example/myfile.txt
 
-# Download and decrypt a file
+# Download and decrypt
 ./transfer.sh receive --key "mySuperSecretKey123" https://transfer.obeone.cloud/example/myfile.txt.enc
 
-# Download an archive and get prompted to unzip it
+# Download archive with unzip prompt
 ./transfer.sh receive -u https://transfer.obeone.cloud/example/archive.zip
 
-# Download a file to a specific path
+# Download to a specific path
 ./transfer.sh receive https://transfer.obeone.cloud/example/image.jpg /home/user/images/
 ```
 
-#### 🗑️ `delete`
+---
 
-Deletes a file from the server using the delete URL provided after uploading.
+### `delete`
 
 ```bash
 ./transfer.sh delete <X-URL-Delete>
 ```
 
-**Example:**
-
 ```bash
 ./transfer.sh delete https://transfer.obeone.cloud/example/myfile.txt/L2s3j...
 ```
 
-#### ℹ️ `info`
+The delete URL is printed by `send` after a successful upload.
 
-Retrieves and displays metadata about a file.
+---
+
+### `info`
 
 ```bash
 ./transfer.sh info <URL>
 ```
-
-**Example:**
 
 ```bash
 ./transfer.sh info https://transfer.obeone.cloud/example/myfile.txt
@@ -166,23 +177,21 @@ Retrieves and displays metadata about a file.
 
 ---
 
-## ⚙️ Environment Variables
+## Environment Variables
 
-Configure the script's default behavior by setting these environment variables:
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TRANSFERSH_URL` | Transfer.sh instance URL | `https://transfer.obeone.cloud` |
+| `TRANSFERSH_MAX_DAYS` | Default expiration in days | — |
+| `TRANSFERSH_MAX_DOWNLOADS` | Default download limit | — |
+| `TRANSFERSH_ENCRYPTION_KEY` | Default encryption/decryption key | — |
+| `AUTH_USER` | Basic auth username | — |
+| `AUTH_PASS` | Basic auth password | — |
+| `LOG_LEVEL` | Log level (`ERROR`/`WARN`/`INFO`/`DEBUG`) | `INFO` |
+| `TMPDIR` | Temporary directory path | system default |
 
-- `TRANSFERSH_URL`: The URL of the Transfer.sh service. (Default: `https://transfer.obeone.cloud`)
-- `TRANSFERSH_MAX_DAYS`: Default maximum number of days for storage.
-- `TRANSFERSH_MAX_DOWNLOADS`: Default maximum number of downloads.
-- `TRANSFERSH_ENCRYPTION_KEY`: Default encryption/decryption key.
-- `LOG_LEVEL`: Default log level (`ERROR`, `WARN`, `INFO`, `DEBUG`). (Default: `INFO`)
-- `AUTH_USER`: Username for basic authentication.
-- `AUTH_PASS`: Password for basic authentication.
-- `TMPDIR`: Path to the temporary directory.
+---
 
-## 👨‍💻 Author
+## License
 
-- **Grégoire Compagnon** (obeone) - [obeone@obeone.org](mailto:obeone@obeone.org)
-
-## 📄 License
-
-This project is licensed under the MIT License.
+MIT — [obeone](https://github.com/obeone)

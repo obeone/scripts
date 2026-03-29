@@ -8,8 +8,9 @@ dependencies = [
     "pillow",
     "coloredlogs",
 ]
+license = "MIT"
 authors = [
-    { name = "Your Name" },
+    { name = "obeone", email = "obeone@obeone.org" },
 ]
 
 [build-system]
