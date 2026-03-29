@@ -1,82 +1,84 @@
-# 🛠️ Scripts Collection 🐍
+![Python](https://img.shields.io/badge/Python-3.7+-blue?logo=python&logoColor=white)
+![Bash](https://img.shields.io/badge/Bash-scripts-4EAA25?logo=gnu-bash&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+![GitHub Stars](https://img.shields.io/github/stars/obeone/scripts?style=flat&logo=github)
 
-A curated collection of small, powerful Python utilities, all neatly organized in a single repository. Each subproject is designed to be self-contained and can be installed individually to suit your needs.
+# scripts
 
----
-
-## 🚀 Projects
-
-| Project | Description |
-| ------- | ----------- |
-| 🐳 [**docker-kubernetes**](docker-kubernetes/README.md) | A wrapper for `docker` to automatically expose ports on a Kubernetes service when running Docker-in-Kubernetes (DinD). |
-| 🐛 [**ks**](ks/README.md) | Your friendly Kubernetes debugging assistant. It helps you spawn a privileged container directly in your pods for easy troubleshooting. |
-| 📊 [**openai-usage**](openai-usage/README.md) | A command-line tool to inspect OpenAI API token usage and estimate costs. |
-| 🖥️ [**proxmox**](proxmox/README.md) | Proxmox VE utilities: migration watcher (live migration progress) and restore watcher (restore task monitoring). |
-| 🖼️ [**slideshow**](slideshow/README.md) | A simple yet elegant image slideshow application built with Tkinter. |
-| 🚀 [**transfer.sh**](transfer.sh/README.md) | A powerful command-line tool for [transfer.sh](https://transfer.sh). |
+A monorepo of self-contained Python and shell utilities for Kubernetes debugging, cloud cost inspection, virtualization monitoring, and more.
 
 ---
 
-## 📦 Installation
+```mermaid
+flowchart TB
+    ROOT["obeone/scripts"]
 
-Most tools are packaged with `pyproject.toml` and can be installed directly from GitHub using [`uv`](https://github.com/astral-sh/uv) — no need to clone the repository.
+    ROOT --> KDBG["kdbg\nKubernetes debug containers"]
+    ROOT --> USAGE["openai-usage\nOpenAI cost inspector"]
+    ROOT --> DK["docker-kubernetes\nDocker-in-Kubernetes port wrapper"]
+    ROOT --> PVE["proxmox/"]
+    ROOT --> SS["slideshow\nTkinter image slideshow"]
+    ROOT --> TRF["transfer.sh\nCLI for transfer.sh"]
 
-### Install directly from GitHub with uv (Recommended)
-
-```bash
-uv tool install 'https://github.com/obeone/scripts.git#subdirectory=<project_directory>'
+    PVE --> MW["migration-watcher\nLive migration monitor"]
+    PVE --> RW["restore-watcher\nRestore task dashboard"]
 ```
 
-For example:
+---
+
+## Projects
+
+| Icon | Project | Lang | Description |
+|------|---------|------|-------------|
+| 🐛 | [**kdbg**](kdbg/README.md) | Python 3.8+ | Interactive CLI to launch privileged debug containers against Kubernetes pods. Wraps `kubectl debug` with fzf selection and PSA management. PyPI: `kdbg` |
+| 📊 | [**openai-usage**](openai-usage/README.md) | Python 3.10+ | Inspect OpenAI API token usage and costs per project/model/key. Color-coded terminal table with live pricing from litellm. PyPI: `openai-usage-report`. Docker available. |
+| 🐳 | [**docker-kubernetes**](docker-kubernetes/README.md) | Bash | Wrapper for `docker` that auto-exposes ports on a Kubernetes service when running Docker-in-Kubernetes (DinD). |
+| 📡 | [**proxmox/migration-watcher**](proxmox/migration-watcher/README.md) | Python 3.7+ | Monitor Proxmox QEMU live migrations with a real-time text-based speed graph. |
+| 🔄 | [**proxmox/restore-watcher**](proxmox/restore-watcher/README.md) | Python 3.8+ | Monitor Proxmox restore tasks with a tqdm-style progress dashboard. |
+| 🖼️ | [**slideshow**](slideshow/README.md) | Python 3.9–3.11 | Tkinter image slideshow with GIF support, shuffle, and brightness control. |
+| 🚀 | [**transfer.sh**](transfer.sh/README.md) | Bash | Feature-rich CLI for transfer.sh: upload, download, delete, encrypt, progress bars. |
+
+---
+
+## Installation
+
+### Python tools — install directly from GitHub with uv (recommended)
+
+No clone needed:
+
+```bash
+uv tool install 'https://github.com/obeone/scripts.git#subdirectory=<project>'
+```
 
 | Tool | Command |
-| ---- | ------- |
-| ks | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=ks'` |
+|------|---------|
+| kdbg | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=kdbg'` |
 | openai-usage | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=openai-usage'` |
 | pve-migration-watcher | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher'` |
 | pve-restore-watcher | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/restore-watcher'` |
 | slideshow | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=slideshow'` |
 
-### From a local clone
+`pipx` works as a drop-in replacement if you prefer it.
 
-```bash
-git clone https://github.com/obeone/scripts.git
-uv tool install ./scripts/<project_directory>
-```
+### Shell scripts
 
-### Using pipx
-
-`pipx` works the same way if you prefer it over `uv`:
-
-```bash
-pipx install 'https://github.com/obeone/scripts.git#subdirectory=<project_directory>'
-```
-
-> **Note**: For non-Python projects like `docker-kubernetes` or `transfer.sh`, refer to their specific `README.md` for installation instructions.
+For `docker-kubernetes` and `transfer.sh`, clone the repo and follow the instructions in each project's `README.md`.
 
 ---
 
-## 💻 Development
+## Development
 
-1. **Clone the repository:**
+```bash
+git clone https://github.com/obeone/scripts.git
+cd scripts/<project>
+uv venv && source .venv/bin/activate
+uv pip install -e .
+```
 
-    ```bash
-    git clone https://github.com/obeone/scripts.git
-    cd scripts
-    ```
+Each sub-project is fully self-contained with its own `pyproject.toml` and dependencies.
 
-2. **Navigate to a subproject:**
+---
 
-    ```bash
-    cd <project_directory>
-    ```
+## License
 
-3. **Set up a virtual environment and install in editable mode:**
-
-    ```bash
-    uv venv
-    source .venv/bin/activate
-    uv pip install -e .
-    ```
-
-Happy hacking! 🎉
+MIT — [Grégoire Compagnon (obeone)](https://github.com/obeone)
