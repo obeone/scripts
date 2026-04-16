@@ -1,5 +1,5 @@
 [project]
-name = "openai-usage-report"
+name = "openai-usage"
 version = "0.3.0"
 description = "Console OpenAI API cost and token usage analysis by key and model"
 readme = "README.md"
