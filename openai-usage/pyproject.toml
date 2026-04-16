@@ -1,6 +1,6 @@
 [project]
 name = "openai-usage"
-version = "0.3.0"
+version = "0.3.1"
 description = "Console OpenAI API cost and token usage analysis by key and model"
 readme = "README.md"
 license = "MIT"
