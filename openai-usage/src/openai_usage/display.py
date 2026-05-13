@@ -6,6 +6,26 @@ from prettytable import PrettyTable
 from termcolor import colored
 
 
+def get_month_from_date(date_value: str) -> str:
+    """
+    Return the month component from a usage date.
+
+    Parameters
+    ----------
+    date_value : str
+        A usage date in 'YYYY-MM-DD' format.
+
+    Returns
+    -------
+    str
+        The month in 'YYYY-MM' format, or the original value if it cannot be
+        split safely.
+    """
+    if len(date_value) >= 7:
+        return date_value[:7]
+    return date_value
+
+
 def get_sort_key_tuple(
     usage_item: dict,
     criteria_list: list[str],
@@ -31,12 +51,14 @@ def get_sort_key_tuple(
     project_id_val = usage_item.get("project_id", "")
     project_name_val = project_names_map.get(project_id_val, project_id_val)
     date_val = usage_item.get("date", "")
+    month_val = get_month_from_date(date_val)
     key_name_val = usage_item.get("api_key_name", "")
     model_val = usage_item.get("model", "")
 
     criteria_to_value_map = {
         "project": project_name_val,
         "day": date_val,
+        "month": month_val,
         "key": key_name_val,
         "model": model_val,
     }
@@ -45,7 +67,7 @@ def get_sort_key_tuple(
     for criterion in criteria_list:
         key_parts.append(criteria_to_value_map.get(criterion.lower(), ""))
 
-    all_possible_criteria = ["project", "day", "key", "model"]
+    all_possible_criteria = ["project", "month", "day", "key", "model"]
     for crit in all_possible_criteria:
         if crit not in criteria_list:
             key_parts.append(criteria_to_value_map[crit])
@@ -101,6 +123,7 @@ def display_results(
     group_label_prefix_map = {
         "project": "Total for Project",
         "day": "Total for day",
+        "month": "Total for month",
         "key": "Total for API Key",
         "model": "Total for Model",
     }
@@ -127,6 +150,11 @@ def display_results(
             model_name = usage.get("model", "Unknown Model")
             item_primary_group_id_val = model_name
             item_primary_group_display_name = model_name
+        elif primary_group_criterion == "month":
+            date_str_group = usage.get("date", "unknown_date")
+            month_str_group = get_month_from_date(date_str_group)
+            item_primary_group_id_val = month_str_group
+            item_primary_group_display_name = month_str_group
         else:
             date_str_group = usage.get("date", "unknown_date")
             item_primary_group_id_val = date_str_group
@@ -166,6 +194,8 @@ def display_results(
             )
 
         date_str_row = usage.get("date", "unknown_date")
+        if "month" in group_by_criteria:
+            date_str_row = get_month_from_date(date_str_row)
         project_id_row = usage.get("project_id", "unknown_project")
         project_name_disp_row = project_names.get(
             project_id_row, project_id_row

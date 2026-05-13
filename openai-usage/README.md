@@ -35,9 +35,9 @@ A command-line tool to inspect token usage and estimated cost for your OpenAI pr
 | Feature | Description |
 |---|---|
 | 📋 **List Projects** | See all projects accessible with your admin API key |
-| 📊 **Detailed Usage** | Usage data broken down by day, model, and API key |
+| 📊 **Detailed Usage** | Usage data broken down by day or month, model, and API key |
 | 💰 **Auto-Updated Pricing** | Pricing fetched from [litellm](https://github.com/BerriAI/litellm) and cached locally |
-| 🔀 **Flexible Grouping** | Group and sort by day, project, key, or model |
+| 🔀 **Flexible Grouping** | Group and sort by day, month, project, key, or model |
 | 📅 **Custom Date Ranges** | Focus on a specific time period |
 | 🎨 **Colorful Output** | Clear, color-coded table for easy reading |
 
@@ -156,7 +156,7 @@ docker build -t openai-usage-report ./openai-usage
 | `--update-pricing` | | Fetch latest pricing from litellm and update local cache | |
 | `--pricing-info` | | Show pricing cache path, last update date, and model count | |
 
-**Available Grouping Criteria**: `day`, `project`, `key`, `model`
+**Available Grouping Criteria**: `day`, `month`, `project`, `key`, `model`
 
 ---
 
