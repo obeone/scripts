@@ -64,7 +64,7 @@ def _build_parser():
         "--group-by",
         type=str,
         nargs="+",
-        choices=["day", "project", "key", "model"],
+        choices=["day", "month", "project", "key", "model"],
         default=["day"],
         help=(
             "Criteria to group and sort results. Order matters for sorting. "
