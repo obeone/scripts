@@ -29,6 +29,7 @@ flowchart TB
 | 🔍 Interactive selection | `fzf`-powered picker for context, namespace, pod, and container |
 | 🐳 Custom debug image | `--image` to use any debug image (default: `obeoneorg/netshoot`) |
 | 🔒 PSA management | Auto-applies `privileged` label, cleans up on exit |
+| 👑 Root by default | Forces `runAsUser: 0` on the ephemeral container (opt-out: `--preserve-user`) |
 | 🧪 Dry-run mode | `--dry-run` prints the generated `kubectl` command |
 | 🎨 Colored logging | Adjustable verbosity with `--log-level` |
 | 🐚 Shell completion | Bash, Zsh, and Fish completion scripts |
@@ -115,6 +116,7 @@ kdbg -C my-cluster -n my-namespace -p my-pod -c app-container
 | `-c`, `--container` | Target container |
 | `-i`, `--image` | Debug image (default: `obeoneorg/netshoot`) |
 | `--profile` | Security profile (default: `sysadmin`) |
+| `--preserve-user` | Inherit target's `runAsUser`/`runAsGroup`/`runAsNonRoot` instead of forcing root |
 | `--dry-run` | Print command without executing |
 | `-l`, `--log-level` | `debug`, `info`, `warn`, `error` |
 
@@ -136,6 +138,12 @@ kdbg -n my-namespace -p my-pod --dry-run
 
 ```bash
 kdbg -n my-namespace -p my-pod -- tcpdump -i eth0
+```
+
+**Inherit the target's user instead of forcing root:**
+
+```bash
+kdbg -n my-namespace -p my-pod --preserve-user
 ```
 
 **Verbose output:**

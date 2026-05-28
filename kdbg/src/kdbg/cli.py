@@ -45,6 +45,46 @@ from .k8s import (
 # Initialize logger for the module
 logger = logging.getLogger(__name__)
 
+
+def _build_root_custom_profile() -> str:
+    """
+    Write a partial container spec to a temp JSON file that forces the
+    ephemeral debug container to run as root.
+
+    The built-in ``sysadmin`` profile of ``kubectl debug`` sets
+    ``privileged: true`` but does not override ``runAsUser`` / ``runAsGroup``
+    / ``runAsNonRoot``. When the target pod (or container) declares a
+    non-root security context, the ephemeral container inherits it and either
+    fails admission or runs without the privileges expected for debugging.
+
+    Returns
+    -------
+    str
+        Absolute path to the temp JSON file. Caller is responsible for
+        scheduling its removal.
+    """
+    custom_spec: Dict[str, Any] = {
+        "securityContext": {
+            "runAsUser": 0,
+            "runAsGroup": 0,
+            "runAsNonRoot": False,
+        }
+    }
+    fd, path = tempfile.mkstemp(prefix="kdbg-custom-", suffix=".json")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(custom_spec, f)
+    logger.debug("Wrote ephemeral container custom profile to '%s': %s", path, custom_spec)
+    return path
+
+
+def _safe_unlink(path: str) -> None:
+    """Remove a file if it exists, ignoring missing-file errors."""
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+
+
 def main() -> None:
     """
     Main function to parse arguments, handle shell completion,
@@ -88,6 +128,14 @@ def main() -> None:
         "--dry-run",
         action="store_true",
         help="Print the kubectl command instead of executing it."
+    )
+    parser.add_argument(
+        "--preserve-user",
+        action="store_true",
+        help=(
+            "Inherit the target pod's runAsUser/runAsGroup/runAsNonRoot "
+            "instead of forcing the ephemeral container to run as root."
+        ),
     )
     parser.add_argument(
         "-l", "--log-level",
@@ -217,10 +265,18 @@ def main() -> None:
     truncated_pod = selected_pod[:max_pod_len].rstrip("-")
     debug_pod_name = f"debug-{truncated_pod}-{uuid.uuid4().hex[:6]}"
     
+    # Force the ephemeral container to run as root regardless of the target
+    # pod's securityContext — the sysadmin profile does not override runAsUser.
+    # Skipped when --preserve-user is set so the original user is inherited.
+    custom_profile_path: Optional[str] = None
+    if not args.preserve_user:
+        custom_profile_path = _build_root_custom_profile()
+        register_cleanup(_safe_unlink, custom_profile_path)
+
     kubectl_command = ["kubectl", "debug", "-it"]
     if selected_context:
         kubectl_command.extend(["--context", selected_context])
-        
+
     kubectl_command.extend([
         "-n", selected_namespace,
         selected_pod,
@@ -228,6 +284,10 @@ def main() -> None:
         "--image", args.image,
         "--container", debug_pod_name,
         "--profile", args.profile,
+    ])
+    if custom_profile_path:
+        kubectl_command.extend(["--custom", custom_profile_path])
+    kubectl_command.extend([
         "--image-pull-policy=Always",
         "--share-processes",
     ])
