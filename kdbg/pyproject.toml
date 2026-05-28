@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kdbg"
-version = "0.4.1"
+version = "0.5.0"
 description = "Interactive CLI to launch privileged debug containers against running Kubernetes pods."
 readme = "README.md"
 authors = [
