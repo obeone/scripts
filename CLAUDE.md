@@ -12,10 +12,10 @@ The root only ships a `.pre-commit-config.yaml` (shared formatters + mypy) and t
 |------|------|--------|-------|
 | `slideshow/` | Python (Tkinter) | 3.9–3.11 | ✅ `pytest` suite under `slideshow/tests/` |
 | `openai-usage/` | Python | ≥3.10 | ✅ `openai-usage/tests/` — also has its own `CLAUDE.md` |
-| `kdbg/` | Python | ≥3.8 | ❌ |
+| `kdbg/` | Python | ≥3.10 | ❌ |
 | `ks/` | Python | — | ❌ (`src/ks/cli.py`) |
 | `proxmox/migration-watcher/` | Python | ≥3.7 | ❌ (single-module `watcher.py` at the project root, not under `src/`) |
-| `proxmox/restore-watcher/` | Python | ≥3.8 | ❌ (single-module `restore_watcher.py`) |
+| `proxmox/restore-watcher/` | Python | ≥3.10 | ✅ `proxmox/restore-watcher/tests/` (single-module `restore_watcher.py`) |
 | `docker-kubernetes/` | Bash | — | ❌ |
 | `transfer.sh/` | Bash | — | ❌ |
 
@@ -40,10 +40,11 @@ Console entrypoints declared in each `pyproject.toml`:
 | `kdbg` | `kdbg` | `kdbg.cli:main` |
 | `ks` | — | `python -m ks.cli` |
 | `proxmox/migration-watcher` | — | `python proxmox/migration-watcher/watcher.py` |
+| `proxmox/restore-watcher` | `pve-restore-watcher` | `python proxmox/restore-watcher/restore_watcher.py` |
 
 ### Tests
 
-Only `slideshow/` and `openai-usage/` have suites. Preferred granularity (smallest first):
+Only `slideshow/`, `openai-usage/` and `proxmox/restore-watcher/` have suites. Preferred granularity (smallest first):
 
 ```bash
 pytest slideshow/tests/test_<module>.py::<test_name> -q
