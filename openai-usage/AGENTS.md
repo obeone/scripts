@@ -2,9 +2,34 @@
 
 ## Project Structure & Module Organization
 
-This directory contains the `openai-usage` Python CLI package inside the
-larger `scripts` mono-repo. Project-specific maintainer notes live in
-`CLAUDE.md`; treat that file as the first source for architecture details.
+This directory contains the `openai-usage-report` Python CLI package inside the
+larger `scripts` mono-repo.
+
+## Packaging: two different names
+
+The distribution name and the command name deliberately differ. Do not
+"fix" one to match the other.
+
+| What | Value | Where it comes from |
+|------|-------|---------------------|
+| PyPI distribution | `openai-usage-report` | `[project].name` |
+| Console command | `openai-usage` | `[project.scripts]` |
+| Import package | `openai_usage` | `src/openai_usage/` |
+| Docker image | `obeoneorg/openai-usage-report` | `docker-openai-usage.yaml` |
+
+`openai-usage` on PyPI is an unrelated project owned by someone else, so
+publishing under that name fails with `403 Forbidden`. Renaming
+`[project].name` to `openai-usage` breaks the release workflow; it happened
+once already and silently blocked publishing for months.
+
+Passing the command name where uv expects the distribution name is what
+produces `Package name (openai-usage-report) provided --from does not match
+request (openai-usage)`. Install from the path instead:
+
+```bash
+uv tool install .          # correct
+uv tool install openai-usage --from .   # wrong, this is the error above
+```
 
 - `src/openai_usage/`: package source code.
 - `src/openai_usage/cli.py`: argparse entry point and orchestration.
@@ -14,7 +39,7 @@ larger `scripts` mono-repo. Project-specific maintainer notes live in
 - `docs/`: design notes and implementation plans.
 - `Dockerfile`, `pyproject.toml`, `README.md`: packaging and runtime metadata.
 
-There is currently no dedicated test directory for this package.
+- `tests/`: `pytest` suite.
 
 ## Build, Test, and Development Commands
 
@@ -52,8 +77,9 @@ messages. Keep comments sparse; add them only where behavior is not obvious.
 
 ## Testing Guidelines
 
-No automated test suite exists yet. When adding tests, place them under
-`tests/`, use `pytest`, and name files `test_<module>.py`. Test names should
+Run the suite with `uv run --with pytest pytest -q` from `openai-usage/`.
+Place new tests under `tests/`, use `pytest`, and name files
+`test_<module>.py`. Test names should
 describe expected behavior, for example
 `test_fetch_project_usage_handles_paginated_results`. For bug fixes, add a
 regression test that fails before the fix and passes after it.
