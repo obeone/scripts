@@ -22,6 +22,7 @@ flowchart TB
 
     PVE --> MW["migration-watcher\nLive migration monitor"]
     PVE --> RW["restore-watcher\nRestore task dashboard"]
+    PVE --> DMW["disk-move-watcher\nDisk move dashboard"]
 ```
 
 ---
@@ -34,7 +35,8 @@ flowchart TB
 | 📊 | [**openai-usage**](openai-usage/README.md) | Python 3.10+ | Inspect OpenAI API token usage and costs per project/model/key. Color-coded terminal table with live pricing from litellm. PyPI: `openai-usage-report`. Docker available. |
 | 🐳 | [**docker-kubernetes**](docker-kubernetes/README.md) | Bash | Wrapper for `docker` that auto-exposes ports on a Kubernetes service when running Docker-in-Kubernetes (DinD). |
 | 📡 | [**proxmox/migration-watcher**](proxmox/migration-watcher/README.md) | Python 3.7+ | Monitor Proxmox QEMU live migrations with a real-time text-based speed graph. |
-| 🔄 | [**proxmox/restore-watcher**](proxmox/restore-watcher/README.md) | Python 3.8+ | Monitor Proxmox restore tasks with a tqdm-style progress dashboard. |
+| 🔄 | [**proxmox/restore-watcher**](proxmox/restore-watcher/README.md) | Python 3.10+ | Monitor Proxmox restore tasks with a tqdm-style progress dashboard. |
+| 💽 | [**proxmox/disk-move-watcher**](proxmox/disk-move-watcher/README.md) | Python 3.10+ | Monitor Proxmox disk moves (`qm move-disk` / `pct move-volume`) with a tqdm-style progress dashboard. |
 | 🖼️ | [**slideshow**](slideshow/README.md) | Python 3.9–3.11 | Tkinter image slideshow with GIF support, shuffle, and brightness control. |
 | 🚀 | [**transfer.sh**](transfer.sh/README.md) | Bash | Feature-rich CLI for transfer.sh: upload, download, delete, encrypt, progress bars. |
 
@@ -56,6 +58,7 @@ uv tool install 'https://github.com/obeone/scripts.git#subdirectory=<project>'
 | openai-usage | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=openai-usage'` |
 | pve-migration-watcher | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/migration-watcher'` |
 | pve-restore-watcher | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/restore-watcher'` |
+| pve-disk-move-watcher | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=proxmox/disk-move-watcher'` |
 | slideshow | `uv tool install 'https://github.com/obeone/scripts.git#subdirectory=slideshow'` |
 
 `pipx` works as a drop-in replacement if you prefer it.
