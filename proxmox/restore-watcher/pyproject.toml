@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "proxmox-restore-watcher"
-version = "0.1.0"
+version = "0.2.0"
 description = "CLI scaffold to monitor Proxmox restore task progress."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]

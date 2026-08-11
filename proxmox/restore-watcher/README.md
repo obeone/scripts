@@ -1,4 +1,4 @@
-![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![Proxmox VE](https://img.shields.io/badge/Proxmox-VE-orange?logo=proxmox&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -19,7 +19,7 @@ Monitor active Proxmox restore tasks (`qmrestore`/`pctrestore`) with a tqdm-styl
 
 ## Installation
 
-Requires Python 3.8+. No external dependencies.
+Requires Python 3.10+. No external dependencies.
 
 ### Using uv (recommended)
 
@@ -54,6 +54,14 @@ The tool reads `/var/log/pve/tasks/active`, filters for restore operations, and 
 | Flag | Description |
 | ---- | ----------- |
 | `--debug` | Enable verbose debug logs on stderr |
+
+## Development
+
+```bash
+cd proxmox/restore-watcher
+uv sync --extra test
+uv run pytest -q
+```
 
 ## Limitations
 
