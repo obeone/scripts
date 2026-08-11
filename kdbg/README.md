@@ -1,6 +1,6 @@
 # kdbg
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-debug-326CE5?logo=kubernetes&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![PyPI](https://img.shields.io/pypi/v/kdbg?logo=pypi&logoColor=white)
