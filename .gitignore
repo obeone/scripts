@@ -69,3 +69,4 @@ openai_usage.egg-info/
 *.egg-info/
 
 transfer.sh/transfer-orig.sh
+.worktrees/
