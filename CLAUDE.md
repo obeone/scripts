@@ -16,6 +16,7 @@ The root only ships a `.pre-commit-config.yaml` (shared formatters + mypy) and t
 | `ks/` | Python | — | ❌ (`src/ks/cli.py`) |
 | `proxmox/migration-watcher/` | Python | ≥3.7 | ❌ (single-module `watcher.py` at the project root, not under `src/`) |
 | `proxmox/restore-watcher/` | Python | ≥3.10 | ✅ `proxmox/restore-watcher/tests/` (single-module `restore_watcher.py`) |
+| `proxmox/disk-move-watcher/` | Python | ≥3.10 | ✅ `proxmox/disk-move-watcher/tests/` (single-module `disk_move_watcher.py`) |
 | `docker-kubernetes/` | Bash | — | ❌ |
 | `transfer.sh/` | Bash | — | ❌ |
 
@@ -41,10 +42,11 @@ Console entrypoints declared in each `pyproject.toml`:
 | `ks` | — | `python -m ks.cli` |
 | `proxmox/migration-watcher` | — | `python proxmox/migration-watcher/watcher.py` |
 | `proxmox/restore-watcher` | `pve-restore-watcher` | `python proxmox/restore-watcher/restore_watcher.py` |
+| `proxmox/disk-move-watcher` | `pve-disk-move-watcher` | `python proxmox/disk-move-watcher/disk_move_watcher.py` |
 
 ### Tests
 
-Only `slideshow/`, `openai-usage/` and `proxmox/restore-watcher/` have suites. Preferred granularity (smallest first):
+Only `slideshow/`, `openai-usage/`, `proxmox/restore-watcher/` and `proxmox/disk-move-watcher/` have suites. Preferred granularity (smallest first):
 
 ```bash
 pytest slideshow/tests/test_<module>.py::<test_name> -q
@@ -87,9 +89,16 @@ Ships to PyPI as **`openai-usage-report`**, not `openai-usage` (that name belong
 
 `src/kdbg/`: `cli.py`, `k8s.py`, `helpers.py`, `completion.py`. Wraps `kubectl debug` with `fzf` selection; external `kubectl` + `fzf` must be on `PATH` (not declared as Python deps on purpose).
 
-### `proxmox/migration-watcher/` and `restore-watcher/`
+### `proxmox/migration-watcher/`, `restore-watcher/` and `disk-move-watcher/`
 
-Single-script projects — `watcher.py` and `restore_watcher.py` live at the project root, **not** in `src/`. Don't restructure into a package without reason. `plotext` drives the text graph in `migration-watcher`.
+Single-script projects — `watcher.py`, `restore_watcher.py` and `disk_move_watcher.py` live at the project root, **not** in `src/`. Don't restructure into a package without reason. `plotext` drives the text graph in `migration-watcher`.
+
+All three read the same source of truth, `/var/log/pve/tasks/active`, then follow one task log. Two things are easy to get wrong there:
+
+- **Log shard folder.** Proxmox keys the 16 shard folders on the *last* hex digit of the UPID's starttime field (`substr($starttime, 7, 1)` in `PVE::RESTEnvironment::fork_worker`), and starttime is UPID field index **4**, pstart index 3. `migration-watcher` and `restore-watcher` both use the *first* digit and only work thanks to their fallback scan over all 16 folders; `disk-move-watcher` computes it correctly (see its `find_task_logfile` and `tests/test_log_resolution.py`).
+- **Elapsed time.** Online transfers (block-job mirror) print `in <duration>` and the elapsed value comes from the log; the offline `qemu-img convert` path prints none, so samples must be stamped from a monotonic clock.
+
+`disk-move-watcher` also clips every rendered row to the terminal width. The in-place redraw moves the cursor up by a count of *screen rows*, so a single wrapped line desynchronizes every later frame.
 
 ## CodeGraph is indexed
 
