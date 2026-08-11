@@ -11,7 +11,7 @@ The root only ships a `.pre-commit-config.yaml` (shared formatters + mypy) and t
 | Path | Lang | Python | Tests |
 |------|------|--------|-------|
 | `slideshow/` | Python (Tkinter) | 3.9–3.11 | ✅ `pytest` suite under `slideshow/tests/` |
-| `openai-usage/` | Python | ≥3.10 | ✅ `openai-usage/tests/` — also has its own `CLAUDE.md` |
+| `openai-usage/` | Python | ≥3.10 | ✅ `openai-usage/tests/` — also has its own `AGENTS.md` |
 | `kdbg/` | Python | ≥3.10 | ❌ |
 | `ks/` | Python | — | ❌ (`src/ks/cli.py`) |
 | `proxmox/migration-watcher/` | Python | ≥3.7 | ❌ (single-module `watcher.py` at the project root, not under `src/`) |
@@ -79,7 +79,9 @@ Test entry conventions in `slideshow/tests/test_app.py` (e.g. `test_toggle_timer
 
 ### `openai-usage/` — OpenAI cost inspector
 
-Has its own `CLAUDE.md` (read it before editing). Four-module pipeline: `cli` → `pricing` (XDG-cached litellm pricing) → `api` (paginated OpenAI usage) → `display` (prettytable + termcolor). All prices are USD per 1M tokens. Requires `OPENAI_ADMIN_API_KEY` (admin-tier key, not a standard API key).
+Has its own `AGENTS.md` (read it before editing). Four-module pipeline: `cli` → `pricing` (XDG-cached litellm pricing) → `api` (paginated OpenAI usage) → `display` (prettytable + termcolor). All prices are USD per 1M tokens. Requires `OPENAI_ADMIN_API_KEY` (admin-tier key, not a standard API key).
+
+Ships to PyPI as **`openai-usage-report`**, not `openai-usage` (that name belongs to an unrelated project). The console command stays `openai-usage`. See `openai-usage/AGENTS.md` before touching `[project].name`.
 
 ### `kdbg/` — Kubernetes debug-container launcher
 
