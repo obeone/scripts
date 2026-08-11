@@ -122,17 +122,6 @@ def create_photoimage_robust(image: Image.Image) -> tk.PhotoImage | None:
         else:
             image = image.convert('RGB')
 
-    # Step 2: "Clean" the image by re-encoding it to remove problematic metadata
-    try:
-        with io.BytesIO() as clean_buffer:
-            image.save(clean_buffer, format='JPEG', quality=95)  # JPEG is more reliable than PNG
-            clean_buffer.seek(0)
-            image = Image.open(clean_buffer).copy()  # This removes problematic metadata
-            logger.debug("Image cleaned by re-encoding to JPEG to remove metadata issues.")
-    except Exception as clean_error:
-        logger.debug(f"Image cleaning failed, using original: {clean_error}")
-        # Continue with original image if cleaning fails
-
     # Step 3: Try direct ImageTk conversion with cleaned RGB image
     try:
         photo = cast(tk.PhotoImage, ImageTk.PhotoImage(image))
