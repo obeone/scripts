@@ -14,7 +14,7 @@ The root only ships a `.pre-commit-config.yaml` (shared formatters + mypy) and t
 | `openai-usage/` | Python | ≥3.10 | ✅ `openai-usage/tests/` — also has its own `AGENTS.md` |
 | `kdbg/` | Python | ≥3.10 | ❌ |
 | `ks/` | Python | — | ❌ (`src/ks/cli.py`) |
-| `proxmox/migration-watcher/` | Python | ≥3.7 | ❌ (single-module `watcher.py` at the project root, not under `src/`) |
+| `proxmox/migration-watcher/` | Python | ≥3.10 | ✅ `proxmox/migration-watcher/tests/` (single-module `watcher.py` at the project root, not under `src/`) |
 | `proxmox/restore-watcher/` | Python | ≥3.10 | ✅ `proxmox/restore-watcher/tests/` (single-module `restore_watcher.py`) |
 | `proxmox/disk-move-watcher/` | Python | ≥3.10 | ✅ `proxmox/disk-move-watcher/tests/` (single-module `disk_move_watcher.py`) |
 | `docker-kubernetes/` | Bash | — | ❌ |
@@ -46,7 +46,7 @@ Console entrypoints declared in each `pyproject.toml`:
 
 ### Tests
 
-Only `slideshow/`, `openai-usage/`, `proxmox/restore-watcher/` and `proxmox/disk-move-watcher/` have suites. Preferred granularity (smallest first):
+All Python projects ship a suite except `kdbg/` and `ks/`. Preferred granularity (smallest first):
 
 ```bash
 pytest slideshow/tests/test_<module>.py::<test_name> -q
@@ -95,10 +95,14 @@ Single-script projects — `watcher.py`, `restore_watcher.py` and `disk_move_wat
 
 All three read the same source of truth, `/var/log/pve/tasks/active`, then follow one task log. Two things are easy to get wrong there:
 
-- **Log shard folder.** Proxmox keys the 16 shard folders on the *last* hex digit of the UPID's starttime field (`substr($starttime, 7, 1)` in `PVE::RESTEnvironment::fork_worker`), and starttime is UPID field index **4**, pstart index 3. `migration-watcher` and `restore-watcher` both use the *first* digit and only work thanks to their fallback scan over all 16 folders; `disk-move-watcher` computes it correctly (see its `find_task_logfile` and `tests/test_log_resolution.py`).
+- **Log shard folder.** Proxmox keys the 16 shard folders on the *last* hex digit of the UPID's starttime field (`substr($starttime, 7, 1)` in `PVE::RESTEnvironment::fork_worker`), and starttime is UPID field index **4**, pstart index 3. All three watchers now compute it correctly; each keeps a fallback scan over the 16 folders. Regression tests pin it, including a decoy asserting the first digit is not used.
 - **Elapsed time.** Online transfers (block-job mirror) print `in <duration>` and the elapsed value comes from the log; the offline `qemu-img convert` path prints none, so samples must be stamped from a monotonic clock.
+- **Duration grammar.** `PVE::Format::render_duration` joins the largest non-zero units among `w/d/h/m/s` (`0s`, `1m 31s`, `2h 5m 3s`, `1d 2h`). A minutes-and-seconds-only regex silently drops the hours field and makes elapsed time jump backwards at the one hour mark.
+- **Size units.** `PVE::Format::render_bytes` emits `B` through `PiB`, always at one decimal place in these code paths. Handling only MiB and GiB loses the early `0.0 B` samples.
+- **Terminal status.** Only the worker epilogue is terminal: `TASK OK`, `TASK ERROR: <msg>`, `TASK WARNINGS: <N>`. The warnings form ends a task without ever printing `TASK OK`. Matching loose words like "completed" or "success" ends monitoring early on innocuous mid-task lines.
+- **Terminal width.** Every rendered row must be clipped to the terminal width. The in-place redraw moves the cursor up by a count of *screen rows*, so a single wrapped line desynchronizes every later frame and smears the display.
 
-`disk-move-watcher` also clips every rendered row to the terminal width. The in-place redraw moves the cursor up by a count of *screen rows*, so a single wrapped line desynchronizes every later frame.
+Worker types, all confirmed against source: `qmigrate`/`vzmigrate` (migration), `qmrestore`/`vzrestore` (restore, **not** `pctrestore`), `qmmove`/`move_volume` (disk move).
 
 ## CodeGraph is indexed
 

@@ -1,4 +1,4 @@
-![Python](https://img.shields.io/badge/Python-3.7+-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python&logoColor=white)
 ![Bash](https://img.shields.io/badge/Bash-scripts-4EAA25?logo=gnu-bash&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![GitHub Stars](https://img.shields.io/github/stars/obeone/scripts?style=flat&logo=github)
@@ -31,10 +31,10 @@ flowchart TB
 
 | Icon | Project | Lang | Description |
 |------|---------|------|-------------|
-| 🐛 | [**kdbg**](kdbg/README.md) | Python 3.8+ | Interactive CLI to launch privileged debug containers against Kubernetes pods. Wraps `kubectl debug` with fzf selection and PSA management. PyPI: `kdbg` |
+| 🐛 | [**kdbg**](kdbg/README.md) | Python 3.10+ | Interactive CLI to launch privileged debug containers against Kubernetes pods. Wraps `kubectl debug` with fzf selection and PSA management. PyPI: `kdbg` |
 | 📊 | [**openai-usage**](openai-usage/README.md) | Python 3.10+ | Inspect OpenAI API token usage and costs per project/model/key. Color-coded terminal table with live pricing from litellm. PyPI: `openai-usage-report`. Docker available. |
 | 🐳 | [**docker-kubernetes**](docker-kubernetes/README.md) | Bash | Wrapper for `docker` that auto-exposes ports on a Kubernetes service when running Docker-in-Kubernetes (DinD). |
-| 📡 | [**proxmox/migration-watcher**](proxmox/migration-watcher/README.md) | Python 3.7+ | Monitor Proxmox QEMU live migrations with a real-time text-based speed graph. |
+| 📡 | [**proxmox/migration-watcher**](proxmox/migration-watcher/README.md) | Python 3.10+ | Monitor Proxmox QEMU live migrations with a real-time text-based speed graph. |
 | 🔄 | [**proxmox/restore-watcher**](proxmox/restore-watcher/README.md) | Python 3.10+ | Monitor Proxmox restore tasks with a tqdm-style progress dashboard. |
 | 💽 | [**proxmox/disk-move-watcher**](proxmox/disk-move-watcher/README.md) | Python 3.10+ | Monitor Proxmox disk moves (`qm move-disk` / `pct move-volume`) with a tqdm-style progress dashboard. |
 | 🖼️ | [**slideshow**](slideshow/README.md) | Python 3.9–3.11 | Tkinter image slideshow with GIF support, shuffle, and brightness control. |
