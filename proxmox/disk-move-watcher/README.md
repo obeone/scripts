@@ -99,6 +99,13 @@ uv sync --extra test
 uv run pytest -q
 ```
 
+## Related tools
+
+- [`proxmox/restore-watcher`](../restore-watcher/README.md) for `qmrestore` and `vzrestore`
+- [`proxmox/migration-watcher`](../migration-watcher/README.md) for live migrations
+
+All three read `/var/log/pve/tasks/active` and share the same log shard rule and duration grammar.
+
 ## License
 
 MIT
