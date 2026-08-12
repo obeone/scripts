@@ -1,4 +1,4 @@
-![Python](https://img.shields.io/badge/Python-3.7+-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![Proxmox VE](https://img.shields.io/badge/Proxmox-VE-orange?logo=proxmox&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -30,10 +30,12 @@ flowchart TB
 | ETA | Estimated time to completion based on current speed |
 | Log tail | Recent raw log lines shown below the graph |
 | In-place updates | ANSI escape codes keep the display clean and non-scrolling |
+| Warnings handling | Recognizes `TASK WARNINGS` as a terminal outcome, distinct from `TASK OK` and `TASK ERROR` |
+| Resize-aware display | Re-measures the terminal on every frame and clips output to its current width |
 
 ## Installation
 
-Requires Python 3.7+. Must be run on a Proxmox node (or with filesystem access to `/var/log/pve/tasks/`).
+Requires Python 3.10+. Must be run on a Proxmox node (or with filesystem access to `/var/log/pve/tasks/`).
 
 ### Using uv (recommended)
 
@@ -65,7 +67,7 @@ The tool detects active migrations, lets you pick one if several are running, th
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.10+
 - `plotext` (installed automatically)
 - Read access to `/var/log/pve/tasks/` — run on a Proxmox node
 

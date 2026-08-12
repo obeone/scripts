@@ -12,10 +12,10 @@ backend-path = ["."] # Can be omitted if you don't have complex setuptools confi
 # Replace placeholder values with your project's specific details.
 
 name = "proxmox-migration-watcher"
-version = "0.2.0"
+version = "0.3.0"
 description = "CLI tool to monitor Proxmox QEMU migration progress with a text-based transfer speed graph."
 readme = "README.md" # Optional: Create a README.md file in your project root
-requires-python = ">=3.7" # Specify the minimum Python version your project supports
+requires-python = ">=3.10" # Specify the minimum Python version your project supports
 
 # License: Choose a license (e.g., MIT, Apache-2.0).
 # If you have a LICENSE file:
@@ -42,9 +42,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -52,6 +49,9 @@ classifiers = [
     "Topic :: Utilities",
     "Operating System :: POSIX :: Linux", # If primarily for Linux
 ]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0.0"]
 
 # URLs related to your project (optional)
 [project.urls]
