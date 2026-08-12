@@ -93,7 +93,7 @@ Ships to PyPI as **`openai-usage-report`**, not `openai-usage` (that name belong
 
 Single-script projects — `watcher.py`, `restore_watcher.py` and `disk_move_watcher.py` live at the project root, **not** in `src/`. Don't restructure into a package without reason. `plotext` drives the text graph in `migration-watcher`.
 
-All three read the same source of truth, `/var/log/pve/tasks/active`, then follow one task log. Two things are easy to get wrong there:
+All three read the same source of truth, `/var/log/pve/tasks/active`, then follow one task log. Each of the following was a real bug in at least one of them, so check them before writing a fourth watcher:
 
 - **Log shard folder.** Proxmox keys the 16 shard folders on the *last* hex digit of the UPID's starttime field (`substr($starttime, 7, 1)` in `PVE::RESTEnvironment::fork_worker`), and starttime is UPID field index **4**, pstart index 3. All three watchers now compute it correctly; each keeps a fallback scan over the 16 folders. Regression tests pin it, including a decoy asserting the first digit is not used.
 - **Elapsed time.** Online transfers (block-job mirror) print `in <duration>` and the elapsed value comes from the log; the offline `qemu-img convert` path prints none, so samples must be stamped from a monotonic clock.
