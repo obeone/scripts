@@ -2,35 +2,46 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from io import StringIO
 from pathlib import Path
-from typing import Iterator
 
 import restore_watcher
 
 
 def test_detect_terminal_status_for_completion_lines() -> None:
-    """Detect successful terminal status markers in task log lines."""
-    lines = [
-        "TASK OK",
-        "restore completed in 2m 10s",
-        "operation success",
-    ]
-
-    for line in lines:
-        assert restore_watcher.detect_terminal_status(line) == "success"
+    """Detect the success epilogue written by fork_worker."""
+    assert restore_watcher.detect_terminal_status("TASK OK") == "success"
 
 
 def test_detect_terminal_status_for_failure_lines() -> None:
-    """Detect failed terminal status markers in task log lines."""
+    """Detect the failure epilogue written by fork_worker."""
+    line = "TASK ERROR: command 'qmrestore' failed: exit code 1"
+
+    assert restore_watcher.detect_terminal_status(line) == "failure"
+
+
+def test_detect_terminal_status_for_warning_lines() -> None:
+    """Treat TASK WARNINGS as terminal, since TASK OK never follows it."""
+    assert restore_watcher.detect_terminal_status("TASK WARNINGS: 2") == "warnings"
+
+
+def test_detect_terminal_status_ignores_mid_restore_wording() -> None:
+    """Never end monitoring on a line that merely mentions success or failure.
+
+    Only the worker epilogue is terminal. Matching loose words used to stop the
+    dashboard partway through a restore that was still running.
+    """
     lines = [
-        "TASK ERROR: restore failed",
+        "restore completed in 2m 10s",
+        "operation success",
         "restore failed with exit code 1",
         "restore aborted by user",
+        'Logical volume "vm-100-disk-0" successfully removed.',
     ]
 
     for line in lines:
-        assert restore_watcher.detect_terminal_status(line) == "failure"
+        assert restore_watcher.detect_terminal_status(line) is None
 
 
 def test_detect_terminal_status_for_neutral_line() -> None:

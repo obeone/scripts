@@ -4,27 +4,60 @@ from __future__ import annotations
 
 import argparse
 import collections
+import itertools
 import math
-from pathlib import Path
+import os
 import re
+import shutil
 import sys
 import time
-from typing import Callable, Iterable, Iterator, Sequence, TextIO
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from pathlib import Path
+from typing import TextIO
 
-RESTORE_ACTION_MARKERS = ["qmrestore", "pctrestore"]
-RESTORE_KEYWORD_MARKERS = ["restore", "restoring", "backup"]
+# Proxmox worker types for a restore: qmrestore for VMs, vzrestore for LXC
+# containers (PVE::API2::LXC::create_vm picks it when restoring).
+RESTORE_ACTION_MARKERS = ["qmrestore", "vzrestore"]
+RESTORE_KEYWORD_MARKERS = ["restore"]
 ACTIVE_STATUS_MARKERS = {"", "0"}
 
 TASKS_LOG_DIR = "/var/log/pve/tasks"
 ACTIVE_TASKS_INDEX = "active"
 HEX_ARCHIVE_FOLDERS = "0123456789ABCDEF"
+
+# Proxmox renders sizes through PVE::Format::render_bytes, which emits IEC
+# units. Longer unit names must come first in the alternation so that "MiB" is
+# never truncated to a bare "B" match.
+_SIZE_UNIT_ALTERNATION = "KiB|MiB|GiB|TiB|PiB|B"
+_SIZE_UNIT_TO_GIB: dict[str, float] = {
+    "b": 1 / (1024**3),
+    "kib": 1 / (1024**2),
+    "mib": 1 / 1024,
+    "gib": 1.0,
+    "tib": 1024.0,
+    "pib": 1024.0**2,
+}
+
+# PVE::Format::render_duration joins the largest non-zero units among weeks,
+# days, hours, minutes and seconds, e.g. "0s", "3s", "1m 31s", "1d 2h".
+_DURATION_PATTERN = r"(?:\d+[wdhms]\s*)+"
+_DURATION_UNIT_SECONDS: dict[str, int] = {
+    "w": 7 * 24 * 3600,
+    "d": 24 * 3600,
+    "h": 3600,
+    "m": 60,
+    "s": 1,
+}
+
 _PROGRESS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "size_with_total",
         re.compile(
-            r"transferred\s+(?P<transferred>\d+(?:\.\d+)?)\s+"
-            r"(?P<unit>GiB|MiB)\s+of\s+(?P<total>\d+(?:\.\d+)?)\s+"
-            r"(?P<total_unit>GiB|MiB).*?\sin\s+(?P<elapsed>(?:\d+m\s+)?\d+s)",
+            r"transferred\s+(?P<transferred>\d+(?:\.\d+)?)\s*"
+            rf"(?P<unit>{_SIZE_UNIT_ALTERNATION})\b\s+of\s+"
+            r"(?P<total>\d+(?:\.\d+)?)\s*"
+            rf"(?P<total_unit>{_SIZE_UNIT_ALTERNATION})\b"
+            rf".*?\sin\s+(?P<elapsed>{_DURATION_PATTERN})",
             flags=re.IGNORECASE,
         ),
     ),
@@ -41,7 +74,7 @@ _PROGRESS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "percent_only",
         re.compile(
             r"transferred\s+(?P<percent>\d+(?:\.\d+)?)%\s+in\s+"
-            r"(?P<elapsed>(?:\d+m\s+)?\d+s)",
+            rf"(?P<elapsed>{_DURATION_PATTERN})",
             flags=re.IGNORECASE,
         ),
     ),
@@ -49,13 +82,35 @@ _PROGRESS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 ProgressPoint = tuple[int, float, float | None]
 TerminalStatus = str | None
 
-_SUCCESS_STATUS_MARKERS = ("task ok", "completed", "success")
-_FAILURE_STATUS_MARKERS = ("task error", "failed", "aborted")
+# Only the worker epilogue written by PVE::RESTEnvironment::fork_worker is
+# terminal. Matching loose words like "completed" or "success" ended monitoring
+# early on innocuous lines, for instance a volume being removed successfully
+# midway through a restore.
+_SUCCESS_STATUS_MARKERS = ("task ok",)
+_FAILURE_STATUS_MARKERS = ("task error",)
+# A task finishing with warnings ends on TASK WARNINGS instead of TASK OK, so it
+# has to be terminal too or the watcher would wait out the idle timeout on an
+# already finished restore.
+_WARNING_STATUS_MARKERS = ("task warnings",)
 _COLOR_RESET = "\033[0m"
 _COLOR_GREEN = "\033[32m"
 _COLOR_CYAN = "\033[36m"
 _COLOR_YELLOW = "\033[33m"
 _COLOR_DIM = "\033[2m"
+
+# Color escapes take no screen columns, so they must be discounted before any
+# width computation.
+_ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
+
+_MIN_BAR_WIDTH = 8
+_MAX_BAR_WIDTH = 28
+# Highest expendability tag used by the status line segments; see
+# build_tqdm_line for the ordering.
+_MOST_EXPENDABLE_SEGMENT = 5
+_DEFAULT_TERMINAL_WIDTH = 80
+# Budget for tailed log lines when no terminal width is known, e.g. when the
+# dashboard is redirected to a file.
+_DEFAULT_LOG_WIDTH = 140
 
 
 def parse_upid(line: str) -> dict[str, str] | None:
@@ -120,11 +175,14 @@ def find_task_logfile(
     if len(upid_parts) < 8 or upid_parts[0] != "UPID":
         return None
 
-    pstart = upid_parts[4]
-    if not re.fullmatch(r"[0-9A-Fa-f]{8}", pstart):
+    starttime = upid_parts[4]
+    if not re.fullmatch(r"[0-9A-Fa-f]{8}", starttime):
         return None
 
-    expected_folder = pstart[0].upper()
+    # Proxmox shards task logs into 16 folders keyed on the *last* hex digit of
+    # the starttime field, matching substr($starttime, 7, 1) in
+    # PVE::RESTEnvironment::fork_worker.
+    expected_folder = starttime[-1].upper()
     if expected_folder not in HEX_ARCHIVE_FOLDERS:
         return None
 
@@ -191,7 +249,7 @@ def calculate_eta_and_speed_with_memory(
     window = points[-6:]
     total_delta_seconds = 0
     total_delta_value = 0.0
-    for previous_point, current_point in zip(window, window[1:]):
+    for previous_point, current_point in itertools.pairwise(window):
         previous_elapsed, previous_value, _ = previous_point
         elapsed_seconds, current_value, _ = current_point
         delta_seconds = elapsed_seconds - previous_elapsed
@@ -237,6 +295,84 @@ def build_metrics_line(points: Sequence[ProgressPoint]) -> str:
     return f"{progress_text} | {speed_text} | {eta_text}"
 
 
+def visible_length(text: str) -> int:
+    """Count the screen columns one string occupies.
+
+    Parameters
+    ----------
+    text : str
+        Text that may embed ANSI color escapes.
+
+    Returns
+    -------
+    int
+        Number of printable characters, escapes excluded.
+    """
+    return len(_ANSI_PATTERN.sub("", text))
+
+
+def clip_to_width(text: str, width: int) -> str:
+    """Clip one string to a column budget without cutting an ANSI escape.
+
+    A closing reset is appended when the text carried any color, so that a cut
+    never leaks an unterminated escape into the rest of the terminal.
+
+    Parameters
+    ----------
+    text : str
+        Text to clip, possibly containing ANSI color escapes.
+    width : int
+        Maximum number of screen columns.
+
+    Returns
+    -------
+    str
+        The text, shortened when it did not fit.
+    """
+    if width <= 0 or visible_length(text) <= width:
+        return text
+
+    kept: list[str] = []
+    visible = 0
+    index = 0
+    had_escape = False
+    while index < len(text) and visible < width:
+        escape = _ANSI_PATTERN.match(text, index)
+        if escape:
+            kept.append(escape.group())
+            had_escape = True
+            index = escape.end()
+            continue
+        kept.append(text[index])
+        visible += 1
+        index += 1
+
+    clipped = "".join(kept)
+    return f"{clipped}{_COLOR_RESET}" if had_escape else clipped
+
+
+def detect_terminal_width(stream: TextIO | None) -> int:
+    """Detect the usable width of the terminal behind one stream.
+
+    Parameters
+    ----------
+    stream : TextIO or None
+        Output stream to inspect.
+
+    Returns
+    -------
+    int
+        Terminal width in columns, falling back to 80 when unknown.
+    """
+    if stream is not None:
+        try:
+            return os.get_terminal_size(stream.fileno()).columns
+        except (AttributeError, OSError, ValueError):
+            # Not a real terminal, or a stream without a file descriptor.
+            pass
+    return shutil.get_terminal_size((_DEFAULT_TERMINAL_WIDTH, 24)).columns
+
+
 def build_tqdm_line(
     points: Sequence[ProgressPoint],
     speed_gib_s: float,
@@ -244,6 +380,7 @@ def build_tqdm_line(
     eta_seconds: float,
     waiting: bool = False,
     color: bool = False,
+    width: int | None = None,
 ) -> str:
     """Build one tqdm-like status line.
 
@@ -261,6 +398,10 @@ def build_tqdm_line(
         Whether the monitor is idle waiting for new log data.
     color : bool
         Whether to apply ANSI color codes to the output.
+    width : int, optional
+        Terminal width to fit into. The progress bar shrinks first and the least
+        useful metrics drop out before the completion ratio and the ETA, so that
+        the line never wraps.
     """
     percent = 0.0
     transferred = 0.0
@@ -272,13 +413,6 @@ def build_tqdm_line(
         else:
             percent = max(0.0, min(100.0, transferred))
 
-    bar_width = 28
-    filled = int((percent / 100) * bar_width)
-    bar_inner = f"{'=' * filled}{'.' * (bar_width - filled)}"
-    if color:
-        bar = f"{_COLOR_GREEN}[{bar_inner}]{_COLOR_RESET}"
-    else:
-        bar = f"[{bar_inner}]"
     speed_mib_s = speed_gib_s * 1024
     average_speed_mib_s = average_speed_gib_s * 1024
     eta_text = "n/a" if math.isinf(eta_seconds) else _format_eta(eta_seconds)
@@ -292,15 +426,50 @@ def build_tqdm_line(
     else:
         size_text = f"{transferred:6.2f} %"
 
-    now_speed = f"Now {speed_mib_s:6.1f} {_COLOR_CYAN}MiB/s{_COLOR_RESET}" if color else f"Now {speed_mib_s:6.1f} MiB/s"
-    avg_speed = f"Avg {average_speed_mib_s:6.1f} {_COLOR_CYAN}MiB/s{_COLOR_RESET}" if color else f"Avg {average_speed_mib_s:6.1f} MiB/s"
+    now_speed = f"Now {speed_mib_s:6.1f} MiB/s"
+    avg_speed = f"Avg {average_speed_mib_s:6.1f} MiB/s"
+    if color:
+        now_speed = f"Now {speed_mib_s:6.1f} {_COLOR_CYAN}MiB/s{_COLOR_RESET}"
+        avg_speed = f"Avg {average_speed_mib_s:6.1f} {_COLOR_CYAN}MiB/s{_COLOR_RESET}"
     eta_label = f"{_COLOR_YELLOW}ETA{_COLOR_RESET}" if color else "ETA"
 
-    return (
-        f"{bar} {percent:5.1f}% | {size_text} | "
-        f"{now_speed} | {avg_speed} | "
-        f"Elapsed {elapsed_text} | {eta_label} {eta_text}{waiting_text}"
+    # Metric fields in display order, each tagged with how expendable it is. A
+    # narrow terminal drops the highest tags first, so it loses context before
+    # it loses the completion ratio and the ETA.
+    ordered_segments: tuple[tuple[int, str], ...] = (
+        (0, f"{percent:5.1f}%"),
+        (3, size_text),
+        (2, now_speed),
+        (4, avg_speed),
+        (5, f"Elapsed {elapsed_text}"),
+        (1, f"{eta_label} {eta_text}{waiting_text}"),
     )
+
+    def _suffix(max_tag: int) -> str:
+        """Join the segments that fit within the given expendability budget."""
+        kept = [text for tag, text in ordered_segments if tag <= max_tag]
+        return " " + " | ".join(kept)
+
+    suffix = _suffix(_MOST_EXPENDABLE_SEGMENT)
+    bar_width = _MAX_BAR_WIDTH
+    if width is not None:
+        # Two columns go to the bar's brackets. A wrapped line would
+        # desynchronize the in-place redraw, which counts screen rows rather
+        # than logical lines.
+        for max_tag in range(_MOST_EXPENDABLE_SEGMENT, 0, -1):
+            candidate = _suffix(max_tag)
+            available = width - visible_length(candidate) - 2
+            if available >= _MIN_BAR_WIDTH or max_tag == 1:
+                suffix = candidate
+                bar_width = max(_MIN_BAR_WIDTH, min(_MAX_BAR_WIDTH, available))
+                break
+
+    filled = int((percent / 100) * bar_width)
+    bar_inner = f"{'=' * filled}{'.' * (bar_width - filled)}"
+    bar = f"{_COLOR_GREEN}[{bar_inner}]{_COLOR_RESET}" if color else f"[{bar_inner}]"
+
+    line = f"{bar}{suffix}"
+    return line if width is None else clip_to_width(line, width)
 
 
 def build_dashboard_lines(
@@ -311,8 +480,34 @@ def build_dashboard_lines(
     recent_logs: list[str],
     waiting: bool = False,
     color: bool = False,
+    width: int | None = None,
 ) -> list[str]:
-    """Build one status line plus up to five recent log lines."""
+    """Build one status line plus up to five recent log lines.
+
+    Parameters
+    ----------
+    points : Sequence[ProgressPoint]
+        Parsed progress history.
+    speed_gib_s : float
+        Current instantaneous speed in GiB/s.
+    average_speed_gib_s : float
+        Average speed over the full monitoring window in GiB/s.
+    eta_seconds : float
+        Estimated time remaining in seconds.
+    recent_logs : list[str]
+        Recently seen log lines, oldest first.
+    waiting : bool
+        Whether the monitor is idle waiting for new log data.
+    color : bool
+        Whether to apply ANSI color codes to the output.
+    width : int, optional
+        Terminal width every line must fit into.
+
+    Returns
+    -------
+    list[str]
+        The dashboard block, status line first.
+    """
     status_line = build_tqdm_line(
         points,
         speed_gib_s,
@@ -320,11 +515,15 @@ def build_dashboard_lines(
         eta_seconds,
         waiting=waiting,
         color=color,
+        width=width,
     )
+
+    # Log lines are indented by two columns, which eats into their budget.
+    log_budget = _DEFAULT_LOG_WIDTH if width is None else max(width - 2, 1)
 
     lines = [status_line]
     for log_line in recent_logs[-5:]:
-        rendered = _truncate(log_line, 140)
+        rendered = _truncate(log_line, log_budget)
         if color:
             rendered = f"{_COLOR_DIM}{rendered}{_COLOR_RESET}"
         lines.append(f"  {rendered}")
@@ -341,10 +540,16 @@ def render_dashboard(
     if is_tty and previous_line_count > 0:
         output_stream.write(f"\033[{previous_line_count}A")
 
+    # Cursor movement counts screen rows, not logical lines, so a single line
+    # long enough to wrap would shift every following frame upward. Clipping
+    # here guarantees one line equals one row.
+    max_width = detect_terminal_width(output_stream) if is_tty else None
+
     for line in lines:
         if is_tty:
             output_stream.write("\033[2K")
-        output_stream.write(f"{line}\n")
+        rendered = line if max_width is None else clip_to_width(line, max_width)
+        output_stream.write(f"{rendered}\n")
     output_stream.flush()
     return len(lines)
 
@@ -365,26 +570,52 @@ def calculate_total_average_speed(points: Sequence[ProgressPoint]) -> float:
 
 def _format_eta(eta_seconds: float) -> str:
     """Format ETA seconds into hh:mm:ss."""
-    total_seconds = max(0, int(round(eta_seconds)))
+    total_seconds = max(0, round(eta_seconds))
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def _parse_elapsed_seconds(elapsed: str) -> int:
-    """Convert elapsed text like '1m 31s' or '45s' to total seconds."""
-    minutes_match = re.search(r"(?P<minutes>\d+)m", elapsed)
-    seconds_match = re.search(r"(?P<seconds>\d+)s", elapsed)
-    minutes = int(minutes_match.group("minutes")) if minutes_match else 0
-    seconds = int(seconds_match.group("seconds")) if seconds_match else 0
-    return (minutes * 60) + seconds
+    """Convert a Proxmox-rendered duration to total seconds.
+
+    Accepts any subset of the units ``PVE::Format::render_duration`` may emit,
+    so a restore running past the hour mark keeps a monotonic elapsed time.
+
+    Parameters
+    ----------
+    elapsed : str
+        Duration text such as ``45s``, ``1m 31s``, ``2h 5m 3s`` or ``1d 2h``.
+
+    Returns
+    -------
+    int
+        Total seconds, or 0 when no unit could be read.
+    """
+    total = 0
+    for suffix, unit_seconds in _DURATION_UNIT_SECONDS.items():
+        match = re.search(rf"(\d+){suffix}", elapsed)
+        if match:
+            total += int(match.group(1)) * unit_seconds
+    return total
 
 
 def _to_gib(value: float, unit: str) -> float:
-    """Convert MiB/GiB numeric values into GiB."""
-    if unit.lower() == "mib":
-        return value / 1024
-    return value
+    """Convert one IEC size value into GiB.
+
+    Parameters
+    ----------
+    value : float
+        Numeric size as printed in the log.
+    unit : str
+        IEC unit name, case-insensitive (``B`` through ``PiB``).
+
+    Returns
+    -------
+    float
+        Size expressed in GiB, or 0.0 for an unknown unit.
+    """
+    return value * _SIZE_UNIT_TO_GIB.get(unit.lower(), 0.0)
 
 
 def _bytes_to_gib(value: int) -> float:
@@ -402,10 +633,24 @@ def _truncate(value: str, length: int) -> str:
 
 
 def detect_terminal_status(line: str) -> TerminalStatus:
-    """Detect whether one log line reports a terminal restore status."""
+    """Detect whether one log line reports a terminal restore status.
+
+    Parameters
+    ----------
+    line : str
+        One line from the task log.
+
+    Returns
+    -------
+    str or None
+        ``"failure"``, ``"warnings"``, ``"success"``, or None while the restore
+        is still running.
+    """
     lowered = line.lower()
     if any(marker in lowered for marker in _FAILURE_STATUS_MARKERS):
         return "failure"
+    if any(marker in lowered for marker in _WARNING_STATUS_MARKERS):
+        return "warnings"
     if any(marker in lowered for marker in _SUCCESS_STATUS_MARKERS):
         return "success"
     return None
@@ -423,6 +668,7 @@ def map_final_status_message(status: str | None) -> str:
     """Map one terminal status value to a final summary line."""
     summary_by_status = {
         "success": "Final status: success",
+        "warnings": "Final status: success with warnings",
         "failure": "Final status: failure",
         "interrupted": "Final status: interrupted",
         "no-task": "Final status: no-task",
@@ -510,6 +756,14 @@ def collect_monitoring_data(
     )
     color_mode = tty_mode
 
+    def render_width() -> int | None:
+        """Return the column budget for one frame, re-read on every render.
+
+        Re-reading keeps a resized window honored, and one column is kept spare
+        to stay clear of deferred-wrap quirks.
+        """
+        return detect_terminal_width(output_stream) - 1 if tty_mode else None
+
     try:
         for line in log_lines:
             if line:
@@ -530,6 +784,7 @@ def collect_monitoring_data(
                         list(recent_logs),
                         waiting=False,
                         color=color_mode,
+                        width=render_width(),
                     )
                     previous_line_count = render_dashboard(
                         output_stream, lines, previous_line_count, tty_mode
@@ -553,6 +808,7 @@ def collect_monitoring_data(
                     list(recent_logs),
                     waiting=True,
                     color=color_mode,
+                    width=render_width(),
                 )
                 previous_line_count = render_dashboard(
                     output_stream, lines, previous_line_count, tty_mode

@@ -23,14 +23,32 @@ def test_detect_qmrestore_action_as_restore_task() -> None:
     assert restore_tasks[0]["action"] == "qmrestore"
 
 
+def test_detect_vzrestore_action_as_restore_task() -> None:
+    """Detect the LXC restore worker type.
+
+    PVE::API2::LXC::create_vm forks a `vzrestore` worker when restoring a
+    container. The action list used to name a non-existent `pctrestore`.
+    """
+    tasks = [
+        {
+            "upid": "UPID:pve:0001:0001:0001:vzrestore:100:root@pam:",
+            "action": "vzrestore",
+            "status": "0",
+        }
+    ]
+
+    restore_tasks = restore_watcher.filter_restore_tasks(tasks)
+
+    assert len(restore_tasks) == 1
+    assert restore_tasks[0]["action"] == "vzrestore"
+
+
 def test_ignore_non_active_tasks(tmp_path: Path) -> None:
     """Ignore tasks with non-active status values."""
-    active_file_content = "\n".join(
-        [
-            "UPID:pve:0001:0001:0001:qmrestore:100:root@pam: 0 1234",
-            "UPID:pve:0002:0002:0002:qmrestore:101:root@pam: OK 1235",
-            "UPID:pve:0003:0003:0003:qmrestore:102:root@pam:  1236",
-        ]
+    active_file_content = (
+        "UPID:pve:0001:0001:0001:qmrestore:100:root@pam: 0 1234\n"
+        "UPID:pve:0002:0002:0002:qmrestore:101:root@pam: OK 1235\n"
+        "UPID:pve:0003:0003:0003:qmrestore:102:root@pam:  1236"
     )
 
     file_path = _write_active_file(tmp_path, active_file_content)
