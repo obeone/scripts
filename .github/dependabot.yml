@@ -1,0 +1,104 @@
+version: 2
+updates:
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: 06:00
+    timezone: Europe/Paris
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  commit-message:
+    prefix: chore(deps)
+  groups:
+    actions-minor-patch:
+      applies-to: version-updates
+      update-types:
+      - minor
+      - patch
+    actions-major:
+      applies-to: version-updates
+      update-types:
+      - major
+- package-ecosystem: pip
+  directories:
+  - /kdbg
+  - /openai-usage
+  - /proxmox/disk-move-watcher
+  - /proxmox/migration-watcher
+  - /proxmox/restore-watcher
+  - /slideshow
+  schedule:
+    interval: weekly
+    day: monday
+    time: 06:00
+    timezone: Europe/Paris
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  commit-message:
+    prefix: chore(deps)
+    prefix-development: chore(deps-dev)
+    include: scope
+  groups:
+    pip-minor-patch:
+      applies-to: version-updates
+      update-types:
+      - minor
+      - patch
+    pip-major:
+      applies-to: version-updates
+      update-types:
+      - major
+- package-ecosystem: uv
+  directories:
+  - /kdbg
+  - /proxmox/disk-move-watcher
+  - /proxmox/migration-watcher
+  - /proxmox/restore-watcher
+  schedule:
+    interval: weekly
+    day: monday
+    time: 06:00
+    timezone: Europe/Paris
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  commit-message:
+    prefix: chore(deps)
+    prefix-development: chore(deps-dev)
+    include: scope
+  groups:
+    uv-minor-patch:
+      applies-to: version-updates
+      update-types:
+      - minor
+      - patch
+    uv-major:
+      applies-to: version-updates
+      update-types:
+      - major
+- package-ecosystem: docker
+  directory: /openai-usage
+  schedule:
+    interval: weekly
+    day: monday
+    time: 06:00
+    timezone: Europe/Paris
+  open-pull-requests-limit: 5
+  labels:
+  - dependencies
+  commit-message:
+    prefix: chore(deps)
+  groups:
+    docker-minor-patch:
+      applies-to: version-updates
+      update-types:
+      - minor
+      - patch
+    docker-major:
+      applies-to: version-updates
+      update-types:
+      - major
