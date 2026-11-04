@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Canonical project instructions for coding agents. Maintain shared guidance here.
 
 ## Repository shape
 
@@ -118,3 +118,160 @@ Worker types, all confirmed against source: `qmigrate`/`vzmigrate` (migration), 
 ## Cursor / Copilot rules
 
 `.cursor/rules/codegraph.mdc` mirrors the global CodeGraph policy. No `.cursorrules` or `.github/copilot-instructions.md` are present — if they appear later, treat them as higher-priority local policy (per `AGENTS.md`).
+
+## Additional agent and contributor instructions
+
+Guidance for coding agents working in this repository.
+
+### Scope and Layout
+
+- Mono-repo containing small CLI utilities.
+- Main projects:
+  - `slideshow/` (Python package, test suite available)
+  - `ks/` (Python package)
+  - `openai-usage/` (Python package)
+  - `proxmox/migration-watcher/` (Python package, single-module app)
+  - `docker-kubernetes/` (Bash script)
+  - `transfer.sh/` (Bash script)
+- Shared hooks config lives at `.pre-commit-config.yaml`.
+
+### Cursor / Copilot Rules
+
+- `.cursorrules`: not found
+- `.cursor/rules/`: not found
+- `.github/copilot-instructions.md`: not found
+- If these files appear later, treat them as higher-priority local policy.
+
+### Tooling Baseline
+
+- Prefer `uv` for Python environments and installs.
+- Packages are managed with per-project `pyproject.toml` files.
+- Root pre-commit hooks include:
+  - `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-added-large-files`
+  - `black`, `isort`, `ruff --fix --exit-non-zero-on-fix`, `mypy`
+
+### Build / Lint / Test Commands
+
+Run from repository root unless noted.
+
+#### Repository-wide
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+#### slideshow
+
+```bash
+uv venv && source .venv/bin/activate
+uv pip install -e ./slideshow[dev,test]
+
+black slideshow/src slideshow/tests
+isort slideshow/src slideshow/tests
+
+ruff check slideshow/src slideshow/tests
+mypy slideshow/src
+
+pytest slideshow/tests -q
+
+pytest slideshow/tests/test_app.py -q
+
+pytest slideshow/tests/test_app.py::test_toggle_timer -q
+
+pytest slideshow/tests -k "resize and gif" -q
+```
+
+#### ks
+
+```bash
+uv venv && source .venv/bin/activate
+uv pip install -e ./ks
+
+python -m ks.cli --help
+
+ruff check ks/src
+mypy ks/src
+```
+
+#### openai-usage
+
+```bash
+uv venv && source .venv/bin/activate
+uv pip install -e ./openai-usage
+
+python -m api_usage --help
+
+ruff check openai-usage/src
+```
+
+#### proxmox/migration-watcher
+
+```bash
+uv venv && source .venv/bin/activate
+uv pip install -e ./proxmox/migration-watcher
+
+python proxmox/migration-watcher/watcher.py
+```
+
+#### Bash utilities
+
+```bash
+bash -n docker-kubernetes/docker-kube.sh
+bash -n transfer.sh/transfer.sh
+
+bash docker-kubernetes/docker-kube.sh --help || true
+bash transfer.sh/transfer.sh --help
+```
+
+### Single-Test Guidance
+
+- Only `slideshow/` currently has an automated test suite.
+- Preferred single-test pattern:
+  - `pytest slideshow/tests/test_<module>.py::<test_name> -q`
+- During iteration, run the smallest possible target first (single test -> file -> suite).
+
+### Code Style Guidelines
+
+Follow existing code first; use these defaults for new or changed code.
+
+#### Python
+
+- Formatting:
+  - Black style, max line length `88`.
+  - isort with Black profile (`profile = "black"`).
+- Imports:
+  - Group imports as stdlib, third-party, local.
+  - Prefer absolute imports inside each package.
+- Types:
+  - Add type hints for parameters and return values.
+  - Preserve `from __future__ import annotations` where present.
+  - Keep `slideshow` mypy strictness intact (`strict = true`).
+- Naming:
+  - `snake_case` for functions/variables/modules.
+  - `PascalCase` for classes.
+  - `UPPER_SNAKE_CASE` for constants.
+- Docstrings/comments:
+  - Keep module/function docstrings at the existing level of detail.
+  - Write comments only when they add non-obvious context.
+- Error handling:
+  - Catch specific exceptions when possible.
+  - Emit clear failure messages with actionable context.
+  - CLI failures should exit non-zero.
+- Logging:
+  - Use `logging` with module-level loggers.
+  - Keep `coloredlogs` behavior consistent where already used.
+
+#### Bash
+
+- Keep shebang as `#!/usr/bin/env bash`.
+- Use `set -e` (or stricter if safe for that script).
+- Quote variable expansions unless word-splitting is intentional.
+- Prefer small functions with explicit `local` variables.
+- Validate required external commands before main execution.
+
+### Security and Secrets
+
+- Never commit API keys, credentials, or `.env` contents.
+- `openai-usage` requires `OPENAI_ADMIN_API_KEY` via environment variable.
+- Prefer environment variables over inline secrets in commands.
